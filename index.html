@@ -3089,6 +3089,43 @@ function previewMyProfile() {
   openPublicProfile(currentUser.id, currentUser.name, { ...stats, role: 'Setter' });
 }
 
+
+// ---- PROFILE HELPERS (recovered from orphan block) ----
+function updateProfileCardDisplay(profile) {
+  const nameEl = document.getElementById('profile-display-name');
+  const cityEl = document.getElementById('profile-city-tag');
+  if (nameEl) nameEl.textContent = profile.name || currentUser.name || '—';
+  if (cityEl) cityEl.innerHTML = profile.city ? `📍 ${profile.city}` : '';
+}
+
+function renderProfileAvatar(profile, container, size) {
+  if (!container) return;
+  if (profile.photo) {
+    container.outerHTML = `<img id="${container.id}" class="profile-avatar-img" src="${profile.photo}" style="width:${size}px;height:${size}px;">`;
+  } else {
+    const name = profile.name || currentUser?.name || '?';
+    const ini  = name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    container.className = 'profile-avatar-initials';
+    container.style.cssText = `width:${size}px;height:${size}px;font-size:${Math.round(size*0.3)}px;`;
+    container.textContent = ini;
+  }
+}
+
+function updateSidebarAvatar() {
+  const profile  = getProfile();
+  const el       = document.getElementById('sidebar-avatar');
+  if (!el) return;
+  if (profile.photo) {
+    el.innerHTML = `<img src="${profile.photo}" style="width:32px;height:32px;object-fit:cover;border-radius:8px;">`;
+    el.style.background = 'transparent';
+  } else {
+    const name = currentUser?.name || '?';
+    const ini  = name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    el.textContent = ini;
+    el.style.background = '';
+  }
+}
+
 // ---- INIT ----
 (function() {
   document.addEventListener('keydown', e => {
