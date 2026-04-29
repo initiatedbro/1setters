@@ -1865,8 +1865,13 @@ const supa = {
   async select(table, filter = '') {
     return await this.req('GET', `/rest/v1/${table}?${filter}&apikey=${SUPA_KEY}`);
   },
-  async upsert(table, body) {
-    const res = await fetch(SUPA_URL + `/rest/v1/${table}`, {
+  async upsert(table, body, conflictCol = 'user_id') {
+    // Tables in this app use `id` as PRIMARY KEY but `user_id` (or
+    // `user_id,date` for logs) as the UNIQUE row identifier. PostgREST
+    // defaults ON CONFLICT to the PK, which means upserts without
+    // `on_conflict=` would always try INSERT, hit the unique violation,
+    // and silently fail. We explicitly tell it which column to merge on.
+    const res = await fetch(SUPA_URL + `/rest/v1/${table}?on_conflict=${conflictCol}`, {
       method: 'POST',
       headers: {
         'apikey': SUPA_KEY,
@@ -1877,7 +1882,9 @@ const supa = {
       body: JSON.stringify(body)
     });
     const text = await res.text();
-    return text ? JSON.parse(text) : null;
+    const data = text ? JSON.parse(text) : null;
+    if (!res.ok) throw new Error(data?.message || data?.error_description || `${res.status} ${res.statusText}`);
+    return data;
   },
   async delete(table, filter) {
     return await this.req('DELETE', `/rest/v1/${table}?${filter}`);
@@ -2181,7 +2188,7 @@ async function saveFromModal() {
   const existing = logs.find(l => l.date === dateVal);
   if (existing && !confirm(`A log for ${formatDateLabel(dateVal)} already exists. Overwrite it?`)) return;
   try {
-    const res = await supa.upsert('logs', { user_id: currentUser.id, date: dateVal, data });
+    const res = await supa.upsert('logs', { user_id: currentUser.id, date: dateVal, data }, 'user_id,date');
     const saved = res?.[0];
     const entry = { ...data, id: saved?.id, date: dateVal, dateLabel: formatDateLabel(dateVal) };
     if (existing) { const idx = logs.findIndex(l => l.date === dateVal); logs[idx] = entry; }
@@ -2222,7 +2229,7 @@ async function saveLog() {
   const btn = document.querySelector('#page-log .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
-    const res = await supa.upsert('logs', { user_id: currentUser.id, date: dateVal, data });
+    const res = await supa.upsert('logs', { user_id: currentUser.id, date: dateVal, data }, 'user_id,date');
     const saved = res?.[0];
     const entry = { ...data, id: saved?.id, date: dateVal, dateLabel: formatDateLabel(dateVal) };
     if (existing) { const idx = logs.findIndex(l => l.date === dateVal); logs[idx] = entry; }
@@ -2512,7 +2519,7 @@ function startEdit(td, date, field) {
 
     // Save to Supabase (fire and forget)
     const { id, date: logDate, dateLabel, ...logData } = log;
-    supa.upsert('logs', { user_id: currentUser.id, date: logDate, data: logData }).catch(console.warn);
+    supa.upsert('logs', { user_id: currentUser.id, date: logDate, data: logData }, 'user_id,date').catch(console.warn);
 
     // Update display
     td.innerHTML = hasDollar ? '$' + newVal.toLocaleString() : newVal;
