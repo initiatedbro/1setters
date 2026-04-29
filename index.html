@@ -945,6 +945,81 @@
     font-size: 13px; color: var(--text); font-weight: 600;
     margin-left: auto;
   }
+
+  /* ============================================================
+     MOBILE POLISH (≤ 640px)
+     - Stack the layout vertically, sidebar becomes a top bar
+     - Tighten padding, single-column KPI grid
+     - Simplify the leaderboard to medal + name + primary value
+     - Make modals fit the viewport
+     ============================================================ */
+  @media (max-width: 640px) {
+    body { flex-direction: column; }
+
+    /* Sidebar becomes a horizontally-scrolling top bar */
+    .sidebar {
+      width: 100%; min-height: auto; position: static;
+      flex-direction: row; flex-wrap: wrap;
+      padding: 10px 12px; gap: 8px;
+      border-right: none; border-bottom: 1px solid var(--border);
+    }
+    .sidebar > *:not(.sidebar-bottom) { flex-shrink: 0; }
+    .sidebar-bottom { margin-left: auto; padding: 0; border-top: none; }
+    .sidebar nav, .sidebar [class*="nav-list"] {
+      display: flex; flex-direction: row; gap: 6px;
+      overflow-x: auto; scrollbar-width: none; width: 100%;
+      -webkit-overflow-scrolling: touch;
+    }
+    .sidebar nav::-webkit-scrollbar { display: none; }
+    /* Compact nav items */
+    .sidebar a, .sidebar button {
+      white-space: nowrap; padding: 6px 10px; font-size: 12px;
+    }
+
+    /* Main content */
+    .main { padding: 14px; }
+
+    /* Headings */
+    h1, [class*="greeting"], [class*="page-title"] { font-size: 24px !important; line-height: 1.15; }
+
+    /* KPI grid → single column */
+    .stats-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+
+    /* Leaderboard → only medal + name + primary value;
+       hide the rest. Tighten the row. */
+    .lb-row {
+      grid-template-columns: 36px 1fr 70px;
+      padding: 0 10px; min-height: 56px;
+    }
+    .lb-row > div:nth-child(n+4) { display: none; }
+    .lb-row.lb-header > div:nth-child(n+4) { display: none; }
+    .lb-name { font-size: 14px; }
+    .lb-name-col { gap: 8px; }
+
+    /* Profile popup fits the viewport */
+    .profile-modal { width: 95vw; max-width: 95vw; max-height: 92vh; }
+    .pm-stats-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+    .pm-header { padding: 20px 16px 14px; }
+    .pm-name { font-size: 22px !important; }
+    .pm-avatar-img, .pm-avatar-initials {
+      width: 64px !important; height: 64px !important; font-size: 22px !important;
+    }
+
+    /* Auth screen */
+    .auth-box { padding: 0 16px; }
+
+    /* Generic card padding bump-down */
+    .card, [class*="-card"] { padding: 14px !important; }
+
+    /* Tables / wide content */
+    table { font-size: 12px; }
+
+    /* Modal overlay (Log Today modal etc.) */
+    .modal, [class*="modal-content"] { width: 95vw !important; max-width: 95vw !important; }
+
+    /* Side panels (right column) on Leaderboard collapse below */
+    [class*="lb-right-col"], [class*="lb-side"] { width: 100% !important; }
+  }
 </style>
 </head>
 <body>
@@ -1866,11 +1941,6 @@ const supa = {
     return await this.req('GET', `/rest/v1/${table}?${filter}&apikey=${SUPA_KEY}`);
   },
   async upsert(table, body, conflictCol = 'user_id') {
-    // Tables in this app use `id` as PRIMARY KEY but `user_id` (or
-    // `user_id,date` for logs) as the UNIQUE row identifier. PostgREST
-    // defaults ON CONFLICT to the PK, which means upserts without
-    // `on_conflict=` would always try INSERT, hit the unique violation,
-    // and silently fail. We explicitly tell it which column to merge on.
     const res = await fetch(SUPA_URL + `/rest/v1/${table}?on_conflict=${conflictCol}`, {
       method: 'POST',
       headers: {
@@ -2832,7 +2902,7 @@ function renderLbEntries(entries) {
   }[lbSort] || ((a,b) => b.sets - a.sets);
 
   const sorted = [...entries].sort(sortFn);
-  window._lbCache = sorted; // cache so onclick handlers can look up by index
+  window._lbCache = sorted;
   const myIdx  = sorted.findIndex(e => e.name === currentUser.name);
 
   const medalMap = { 0:'🥇', 1:'🥈', 2:'🥉' };
@@ -2894,9 +2964,6 @@ function renderLbTable(html) {
   if (card) card.innerHTML = html;
 }
 
-// Open the public profile modal for the leaderboard row at index `idx`.
-// Looks up cached sorted entries (set in renderLbEntries) — avoids the
-// previous bug of inlining JSON into onclick="" attributes.
 function openLbProfile(idx) {
   const e = (window._lbCache || [])[idx];
   if (!e) return;
