@@ -2736,11 +2736,13 @@ function getMyLbStats(period) {
   const shows   = subset.reduce((a,l)=>a+(l.shows||0),0);
   const pitched = subset.reduce((a,l)=>a+(l.pitched||0),0);
   const closed  = subset.reduce((a,l)=>a+(l.closed||0),0);
+  const cash    = subset.reduce((a,l)=>a+(l.cash||0),0);
+  const revenue = subset.reduce((a,l)=>a+(l.revenue||0),0);
   const days    = subset.length;
   const showRate   = sets    > 0 ? +((shows/sets)*100).toFixed(1)    : 0;
   const showPitch  = shows   > 0 ? +((pitched/shows)*100).toFixed(1) : 0;
   const pitchClose = pitched > 0 ? +((closed/pitched)*100).toFixed(1): 0;
-  return { name: currentUser.name, role: 'Setter', dials, sets, convos, shows, pitched, closed, days, showRate, showPitch, pitchClose };
+  return { name: currentUser.name, role: 'Setter', dials, sets, convos, shows, pitched, closed, cash, revenue, days, showRate, showPitch, pitchClose };
 }
 
 async function pushMyStats() {
@@ -2759,6 +2761,8 @@ async function pushMyStats() {
       shows:      stats.shows,
       pitched:    stats.pitched,
       closed:     stats.closed,
+      cash:       stats.cash,
+      revenue:    stats.revenue,
       days:       stats.days,
       show_rate:  stats.showRate,
       show_pitch: stats.showPitch,
@@ -2786,6 +2790,8 @@ async function loadLeaderboard() {
       shows:      r.shows,
       pitched:    r.pitched,
       closed:     r.closed,
+      cash:       r.cash || 0,
+      revenue:    r.revenue || 0,
       days:       r.days,
       showRate:   r.show_rate,
       showPitch:  r.show_pitch,
@@ -2882,9 +2888,8 @@ function renderLbTable(html) {
 }
 
 // Open the public profile modal for the leaderboard row at index `idx`.
-// Looks up the cached sorted entries (set in renderLbEntries) — this avoids
-// the previous bug of inlining JSON into onclick="" attributes, which broke
-// HTML attribute parsing because of unescaped double quotes.
+// Looks up cached sorted entries (set in renderLbEntries) — avoids the
+// previous bug of inlining JSON into onclick="" attributes.
 function openLbProfile(idx) {
   const e = (window._lbCache || [])[idx];
   if (!e) return;
@@ -3055,6 +3060,8 @@ async function openPublicProfile(uid, name, stats) {
     <div class="pm-stat"><div class="pm-stat-val">${stats.dials?.toLocaleString() ?? 0}</div><div class="pm-stat-label">Dials</div></div>
     <div class="pm-stat"><div class="pm-stat-val" style="color:var(--green)">${stats.closed ?? 0}</div><div class="pm-stat-label">Closed</div></div>
     <div class="pm-stat"><div class="pm-stat-val">${stats.days ?? 0}</div><div class="pm-stat-label">Days Logged</div></div>
+    <div class="pm-stat"><div class="pm-stat-val" style="color:var(--green)">$${(stats.cash ?? 0).toLocaleString()}</div><div class="pm-stat-label">Cash Collected</div></div>
+    <div class="pm-stat"><div class="pm-stat-val" style="color:var(--yellow)">$${(stats.revenue ?? 0).toLocaleString()}</div><div class="pm-stat-label">Revenue Generated</div></div>
   ` : '';
 
   const socialsEl = document.getElementById('pm-socials');
@@ -3070,6 +3077,9 @@ async function openPublicProfile(uid, name, stats) {
       socialsEl.innerHTML += `<a class="pm-social-btn" href="${s.url(profile[s.key])}" target="_blank">${s.icon} ${s.label}</a>`;
     }
   });
+  if (!socialsEl.innerHTML) {
+    socialsEl.innerHTML = `<div style="color:var(--muted);font-size:12px;font-style:italic;">No social links added</div>`;
+  }
 
   document.getElementById('profile-modal-overlay').classList.add('open');
 }
