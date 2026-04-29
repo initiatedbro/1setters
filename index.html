@@ -2819,6 +2819,7 @@ function renderLbEntries(entries) {
   }[lbSort] || ((a,b) => b.sets - a.sets);
 
   const sorted = [...entries].sort(sortFn);
+  window._lbCache = sorted; // cache so onclick handlers can look up by index
   const myIdx  = sorted.findIndex(e => e.name === currentUser.name);
 
   const medalMap = { 0:'🥇', 1:'🥈', 2:'🥉' };
@@ -2843,7 +2844,7 @@ function renderLbEntries(entries) {
 
     return `<div class="lb-row ${isMe ? 'lb-me' : ''}">
       <div>${rankCol}</div>
-      <div class="lb-name-col" onclick="openPublicProfile('${e.uid||''}','${e.name}',${JSON.stringify(e).replace(/'/g,"\\'")})" style="cursor:pointer;" title="View ${e.name}'s profile">
+      <div class="lb-name-col" onclick="openLbProfile(${i})" style="cursor:pointer;" title="View ${e.name.replace(/"/g,'&quot;')}'s profile">
         <div class="lb-avatar" style="background:${bg}">${e.photo ? `<img src="${e.photo}" style="width:32px;height:32px;object-fit:cover;border-radius:8px;">` : initials(e.name)}</div>
         <div>
           <div style="display:flex;align-items:center;gap:6px;">
@@ -2878,6 +2879,16 @@ function renderLbEntries(entries) {
 function renderLbTable(html) {
   const card = document.getElementById('lb-table-card');
   if (card) card.innerHTML = html;
+}
+
+// Open the public profile modal for the leaderboard row at index `idx`.
+// Looks up the cached sorted entries (set in renderLbEntries) — this avoids
+// the previous bug of inlining JSON into onclick="" attributes, which broke
+// HTML attribute parsing because of unescaped double quotes.
+function openLbProfile(idx) {
+  const e = (window._lbCache || [])[idx];
+  if (!e) return;
+  openPublicProfile(e.uid || '', e.name, e);
 }
 
 function updateMyPosition(sorted, myIdx) {
