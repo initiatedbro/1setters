@@ -946,17 +946,9 @@
     margin-left: auto;
   }
 
-  /* ============================================================
-     MOBILE POLISH (≤ 640px)
-     - Stack the layout vertically, sidebar becomes a top bar
-     - Tighten padding, single-column KPI grid
-     - Simplify the leaderboard to medal + name + primary value
-     - Make modals fit the viewport
-     ============================================================ */
+  /* MOBILE POLISH (≤ 640px) */
   @media (max-width: 640px) {
     body { flex-direction: column; }
-
-    /* Sidebar becomes a horizontally-scrolling top bar */
     .sidebar {
       width: 100%; min-height: auto; position: static;
       flex-direction: row; flex-wrap: wrap;
@@ -971,22 +963,12 @@
       -webkit-overflow-scrolling: touch;
     }
     .sidebar nav::-webkit-scrollbar { display: none; }
-    /* Compact nav items */
     .sidebar a, .sidebar button {
       white-space: nowrap; padding: 6px 10px; font-size: 12px;
     }
-
-    /* Main content */
     .main { padding: 14px; }
-
-    /* Headings */
     h1, [class*="greeting"], [class*="page-title"] { font-size: 24px !important; line-height: 1.15; }
-
-    /* KPI grid → single column */
     .stats-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
-
-    /* Leaderboard → only medal + name + primary value;
-       hide the rest. Tighten the row. */
     .lb-row {
       grid-template-columns: 36px 1fr 70px;
       padding: 0 10px; min-height: 56px;
@@ -995,8 +977,6 @@
     .lb-row.lb-header > div:nth-child(n+4) { display: none; }
     .lb-name { font-size: 14px; }
     .lb-name-col { gap: 8px; }
-
-    /* Profile popup fits the viewport */
     .profile-modal { width: 95vw; max-width: 95vw; max-height: 92vh; }
     .pm-stats-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
     .pm-header { padding: 20px 16px 14px; }
@@ -1004,20 +984,10 @@
     .pm-avatar-img, .pm-avatar-initials {
       width: 64px !important; height: 64px !important; font-size: 22px !important;
     }
-
-    /* Auth screen */
     .auth-box { padding: 0 16px; }
-
-    /* Generic card padding bump-down */
     .card, [class*="-card"] { padding: 14px !important; }
-
-    /* Tables / wide content */
     table { font-size: 12px; }
-
-    /* Modal overlay (Log Today modal etc.) */
     .modal, [class*="modal-content"] { width: 95vw !important; max-width: 95vw !important; }
-
-    /* Side panels (right column) on Leaderboard collapse below */
     [class*="lb-right-col"], [class*="lb-side"] { width: 100% !important; }
   }
 </style>
@@ -1890,8 +1860,16 @@
 const SUPA_URL = 'https://patooxnyklmknihshybz.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdG9veG55a2xta25paHNoeWJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0ODE2OTQsImV4cCI6MjA5MzA1NzY5NH0.aqWn0TelQKb5FZdC34Bg4NzquUnYESiXXLB2xEHs51M';
 
+// Detect "JWT expired" / 401 responses so we can transparently refresh
+// the access token using the refresh_token and retry the request once.
+function _isJwtExpired(status, data) {
+  if (status !== 401) return false;
+  const msg = (data?.message || data?.error_description || data?.error || '').toLowerCase();
+  return msg.includes('jwt expired') || msg.includes('invalid jwt') || msg.includes('token has expired');
+}
+
 const supa = {
-  async req(method, path, body) {
+  async req(method, path, body, _retried) {
     const headers = {
       'apikey': SUPA_KEY,
       'Authorization': 'Bearer ' + (currentToken || SUPA_KEY),
@@ -1905,6 +1883,10 @@ const supa = {
     });
     const text = await res.text();
     const data = text ? JSON.parse(text) : null;
+    if (_isJwtExpired(res.status, data) && !_retried) {
+      const ok = await supa.auth.refresh();
+      if (ok) return supa.req(method, path, body, true);
+    }
     if (!res.ok) throw new Error(data?.message || data?.error_description || res.statusText);
     return data;
   },
@@ -1929,6 +1911,33 @@ const supa = {
       if (d.error || d.error_description) throw new Error(d.error_description || d.error || 'Invalid credentials');
       return d;
     },
+    // Use the stored refresh_token to mint a new access token. Updates
+    // currentToken and persists the new session. Returns true on success.
+    async refresh() {
+      const saved = JSON.parse(localStorage.getItem('sb_session') || 'null');
+      const refresh_token = saved?.refresh_token;
+      if (!refresh_token) return false;
+      try {
+        const res = await fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', {
+          method: 'POST',
+          headers: { 'apikey': SUPA_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token })
+        });
+        const d = await res.json();
+        if (!res.ok || !d.access_token) return false;
+        currentToken = d.access_token;
+        const newSession = {
+          token: currentToken,
+          refresh_token: d.refresh_token || refresh_token,
+          expires_at: Date.now() + ((d.expires_in || 3600) * 1000),
+          user: saved.user
+        };
+        localStorage.setItem('sb_session', JSON.stringify(newSession));
+        return true;
+      } catch (e) {
+        return false;
+      }
+    },
     async signOut(token) {
       await fetch(SUPA_URL + '/auth/v1/logout', {
         method: 'POST',
@@ -1940,7 +1949,7 @@ const supa = {
   async select(table, filter = '') {
     return await this.req('GET', `/rest/v1/${table}?${filter}&apikey=${SUPA_KEY}`);
   },
-  async upsert(table, body, conflictCol = 'user_id') {
+  async upsert(table, body, conflictCol = 'user_id', _retried) {
     const res = await fetch(SUPA_URL + `/rest/v1/${table}?on_conflict=${conflictCol}`, {
       method: 'POST',
       headers: {
@@ -1953,6 +1962,10 @@ const supa = {
     });
     const text = await res.text();
     const data = text ? JSON.parse(text) : null;
+    if (_isJwtExpired(res.status, data) && !_retried) {
+      const ok = await supa.auth.refresh();
+      if (ok) return supa.upsert(table, body, conflictCol, true);
+    }
     if (!res.ok) throw new Error(data?.message || data?.error_description || `${res.status} ${res.statusText}`);
     return data;
   },
@@ -2060,7 +2073,12 @@ async function handleSignup() {
     if (res.access_token) {
       currentToken = res.access_token;
       currentUser  = { id: res.user.id, email: res.user.email, name };
-      localStorage.setItem('sb_session', JSON.stringify({ token: currentToken, user: currentUser }));
+      localStorage.setItem('sb_session', JSON.stringify({
+        token: currentToken,
+        refresh_token: res.refresh_token,
+        expires_at: Date.now() + ((res.expires_in || 3600) * 1000),
+        user: currentUser
+      }));
       // Create profile row
       await supa.upsert('profiles', { user_id: currentUser.id, name, email, lb_optin: false });
       setAuthLoading('signup-btn', false);
@@ -2089,7 +2107,12 @@ async function handleLogin() {
     currentToken = res.access_token;
     const name   = res.user.user_metadata?.full_name || email.split('@')[0];
     currentUser  = { id: res.user.id, email: res.user.email, name };
-    localStorage.setItem('sb_session', JSON.stringify({ token: currentToken, user: currentUser }));
+    localStorage.setItem('sb_session', JSON.stringify({
+      token: currentToken,
+      refresh_token: res.refresh_token,
+      expires_at: Date.now() + ((res.expires_in || 3600) * 1000),
+      user: currentUser
+    }));
     setAuthLoading('login-btn', false);
     await bootDashboard();
   } catch(e) {
@@ -3232,14 +3255,23 @@ function updateSidebarAvatar() {
   });
 
   // Check for saved Supabase session
-  const saved = JSON.parse(localStorage.getItem('sb_session') || 'null');
-  if (saved?.token && saved?.user) {
-    currentToken = saved.token;
-    currentUser  = saved.user;
-    bootDashboard();
-  } else {
-    document.body.style.overflow = 'hidden';
-  }
+  (async () => {
+    const saved = JSON.parse(localStorage.getItem('sb_session') || 'null');
+    if (saved?.token && saved?.user) {
+      currentToken = saved.token;
+      currentUser  = saved.user;
+      // If the access token is already expired (or expires within 60s), refresh
+      // BEFORE booting so loadUserData doesn't immediately 401.
+      if (saved.expires_at && saved.expires_at < Date.now() + 60_000 && saved.refresh_token) {
+        await supa.auth.refresh();
+      }
+      // Schedule periodic proactive refresh ~5 min before expiry, every 30 min
+      setInterval(() => { supa.auth.refresh(); }, 30 * 60 * 1000);
+      bootDashboard();
+    } else {
+      document.body.style.overflow = 'hidden';
+    }
+  })();
 })();
 </script>
 </body>
