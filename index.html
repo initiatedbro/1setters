@@ -2717,7 +2717,13 @@ function getLogsForPeriod(period) {
   if (period === 'alltime') return logs;
   const now = new Date();
   return logs.filter(l => {
-    const d = new Date(l.date);
+    // Parse the YYYY-MM-DD string as a LOCAL-time date. `new Date("2026-05-01")`
+    // parses as UTC midnight, which in a timezone west of UTC (e.g. US Eastern)
+    // shifts back to the previous day in local time — causing first-of-month
+    // logs to be filtered out of the wrong month.
+    const [y, m, day] = (l.date || '').split('-').map(Number);
+    if (!y) return false;
+    const d = new Date(y, m - 1, day);
     if (period === 'month') {
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
     }
