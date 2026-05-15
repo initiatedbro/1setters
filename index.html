@@ -1188,7 +1188,7 @@
     </div>
 
     <!-- MONEY CARDS -->
-    <div class="stats-grid" style="grid-template-columns: repeat(2,1fr); margin-bottom:20px;">
+    <div class="stats-grid" style="grid-template-columns: repeat(3,1fr); margin-bottom:20px;">
       <div class="stat-card green">
         <div class="stat-icon green">💵</div>
         <div class="stat-label">Cash Collected</div>
@@ -1200,6 +1200,12 @@
         <div class="stat-label">Revenue Generated</div>
         <div class="stat-value yellow" id="stat-revenue">—</div>
         <div class="stat-sub" id="stat-revenue-sub">No logs yet</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-icon green">🪙</div>
+        <div class="stat-label">Commissions Made</div>
+        <div class="stat-value green" id="stat-commission">—</div>
+        <div class="stat-sub" id="stat-commission-sub">$50 per show pitched</div>
       </div>
     </div>
 
@@ -2379,10 +2385,16 @@ function renderOverview() {
   document.getElementById('stat-fumbles-sub').textContent = pct(totalFumbles,totalSets) ? pct(totalFumbles,totalSets)+'% fumble rate' : '';
 
   const totalRevenue = sum('revenue');
-  const cashEl    = document.getElementById('stat-cash');
-  const revenueEl = document.getElementById('stat-revenue');
-  if (cashEl)    { cashEl.textContent    = '$' + totalCash.toLocaleString(); document.getElementById('stat-cash-sub').textContent = `across ${logs.length} days`; }
-  if (revenueEl) { revenueEl.textContent = '$' + totalRevenue.toLocaleString(); document.getElementById('stat-revenue-sub').textContent = `total pipeline value`; }
+  // $50 commission per appointment that showed up AND was pitched the offer.
+  // Since you can't pitch without a show, totalPitched == "shows + offer presented".
+  const COMMISSION_PER_PITCH = 50;
+  const totalCommission = totalPitched * COMMISSION_PER_PITCH;
+  const cashEl       = document.getElementById('stat-cash');
+  const revenueEl    = document.getElementById('stat-revenue');
+  const commissionEl = document.getElementById('stat-commission');
+  if (cashEl)       { cashEl.textContent       = '$' + totalCash.toLocaleString(); document.getElementById('stat-cash-sub').textContent = `across ${logs.length} days`; }
+  if (revenueEl)    { revenueEl.textContent    = '$' + totalRevenue.toLocaleString(); document.getElementById('stat-revenue-sub').textContent = `total pipeline value`; }
+  if (commissionEl) { commissionEl.textContent = '$' + totalCommission.toLocaleString(); document.getElementById('stat-commission-sub').textContent = `${totalPitched} pitched × $${COMMISSION_PER_PITCH}`; }
 
   document.getElementById('stat-showrate').textContent = showRate !== null ? showRate+'%' : '—';
   document.getElementById('stat-showpitch').textContent = showPitch !== null ? showPitch+'%' : '—';
