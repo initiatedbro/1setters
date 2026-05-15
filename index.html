@@ -2349,27 +2349,41 @@ async function saveLog() {
 }
 
 // ---- OVERVIEW RENDER ----
-function sum(field) {
-  return logs.reduce((a,l) => a + (l[field]||0), 0);
+// `sum` operates on a passed-in subset so renderOverview can scope to the
+// current month while other callers (renderStatsCard etc.) keep their own
+// period. Falls back to the global `logs` array for backwards compatibility.
+function sum(field, subset) {
+  const src = subset || logs;
+  return src.reduce((a,l) => a + (l[field]||0), 0);
 }
 
 function renderOverview() {
+  // Overview tiles show only THIS MONTH's numbers. Rolls over automatically:
+  // when the calendar month changes, the filter starts returning the new
+  // month's logs and old months drop off the tiles.
+  const monthLogs = getLogsForPeriod('month');
   if (logs.length === 0) return;
 
-  const totalDials = sum('dials');
-  const totalPickups = sum('pickups');
-  const totalConvos = sum('convos');
-  const totalDQ = sum('dq');
-  const totalSets = sum('sets');
-  const totalFumbles = sum('fumbles');
-  const totalShows = sum('shows');
-  const totalPitched = sum('pitched');
-  const totalClosed = sum('closed');
-  const totalCash = sum('cash');
+  const totalDials = sum('dials', monthLogs);
+  const totalPickups = sum('pickups', monthLogs);
+  const totalConvos = sum('convos', monthLogs);
+  const totalDQ = sum('dq', monthLogs);
+  const totalSets = sum('sets', monthLogs);
+  const totalFumbles = sum('fumbles', monthLogs);
+  const totalShows = sum('shows', monthLogs);
+  const totalPitched = sum('pitched', monthLogs);
+  const totalClosed = sum('closed', monthLogs);
+  const totalCash = sum('cash', monthLogs);
 
   const showRate = pct(totalShows, totalSets);
   const showPitch = pct(totalPitched, totalShows);
   const pitchClose = pct(totalClosed, totalPitched);
+
+  // Show the current month name in the page subtitle so it's clear the
+  // numbers reflect this month and not all-time.
+  const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const subEl = document.getElementById('overview-date-line');
+  if (subEl) subEl.textContent = `${monthLabel} · ${monthLogs.length} day${monthLogs.length===1?'':'s'} logged`;
 
   document.getElementById('stat-dials').textContent = totalDials;
   document.getElementById('stat-dials-sub').textContent = `${totalPickups} pick ups`;
@@ -2384,7 +2398,7 @@ function renderOverview() {
   document.getElementById('stat-fumbles').textContent = totalFumbles;
   document.getElementById('stat-fumbles-sub').textContent = pct(totalFumbles,totalSets) ? pct(totalFumbles,totalSets)+'% fumble rate' : '';
 
-  const totalRevenue = sum('revenue');
+  const totalRevenue = sum('revenue', monthLogs);
   // $50 commission per appointment that showed up AND was pitched the offer.
   // Since you can't pitch without a show, totalPitched == "shows + offer presented".
   const COMMISSION_PER_PITCH = 50;
@@ -2392,8 +2406,8 @@ function renderOverview() {
   const cashEl       = document.getElementById('stat-cash');
   const revenueEl    = document.getElementById('stat-revenue');
   const commissionEl = document.getElementById('stat-commission');
-  if (cashEl)       { cashEl.textContent       = '$' + totalCash.toLocaleString(); document.getElementById('stat-cash-sub').textContent = `across ${logs.length} days`; }
-  if (revenueEl)    { revenueEl.textContent    = '$' + totalRevenue.toLocaleString(); document.getElementById('stat-revenue-sub').textContent = `total pipeline value`; }
+  if (cashEl)       { cashEl.textContent       = '$' + totalCash.toLocaleString(); document.getElementById('stat-cash-sub').textContent = `across ${monthLogs.length} day${monthLogs.length===1?'':'s'} this month`; }
+  if (revenueEl)    { revenueEl.textContent    = '$' + totalRevenue.toLocaleString(); document.getElementById('stat-revenue-sub').textContent = `this month's pipeline`; }
   if (commissionEl) { commissionEl.textContent = '$' + totalCommission.toLocaleString(); document.getElementById('stat-commission-sub').textContent = `${totalPitched} pitched × $${COMMISSION_PER_PITCH}`; }
 
   document.getElementById('stat-showrate').textContent = showRate !== null ? showRate+'%' : '—';
@@ -3171,6 +3185,7 @@ async function openPublicProfile(uid, name, stats) {
     <div class="pm-stat"><div class="pm-stat-val">${stats.days ?? 0}</div><div class="pm-stat-label">Days Logged</div></div>
     <div class="pm-stat"><div class="pm-stat-val" style="color:var(--green)">$${(stats.cash ?? 0).toLocaleString()}</div><div class="pm-stat-label">Cash Collected</div></div>
     <div class="pm-stat"><div class="pm-stat-val" style="color:var(--yellow)">$${(stats.revenue ?? 0).toLocaleString()}</div><div class="pm-stat-label">Revenue Generated</div></div>
+    <div class="pm-stat"><div class="pm-stat-val" style="color:var(--green)">$${((stats.pitched ?? 0) * 50).toLocaleString()}</div><div class="pm-stat-label">Commissions Made</div></div>
   ` : '';
 
   const socialsEl = document.getElementById('pm-socials');
