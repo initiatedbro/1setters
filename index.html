@@ -544,13 +544,20 @@ function inRange(s,a,b){const d=parseD(s);return d>=a&&d<=b;}
 // Aggregate setter logs. Setter fields: dials, pickups, convos, dq, sets,
 // fumbles, shows, pitched, closed, cash, revenue. Derived rates: showRate
 // (shows/sets), showPitch (pitched/shows), pitchClose (closed/pitched),
-// fumbleRate, commission ($50 × pitched).
+// fumbleRate. Commission is entered manually per log (l.commission), with
+// an optional per-log rate (l.commissionRate, %) that auto-computes from
+// cash when the user enters a rate instead of a dollar amount.
 function agg(logs){
-  const t={dials:0,pickups:0,convos:0,dq:0,sets:0,fumbles:0,shows:0,pitched:0,closed:0,cash:0,revenue:0,days:logs.length,best:0};
+  const t={dials:0,pickups:0,convos:0,dq:0,sets:0,fumbles:0,shows:0,pitched:0,closed:0,cash:0,revenue:0,commission:0,days:logs.length,best:0};
   logs.forEach(l=>{
     t.dials+=l.dials||0; t.pickups+=l.pickups||0; t.convos+=l.convos||0; t.dq+=l.dq||0;
     t.sets+=l.sets||0; t.fumbles+=l.fumbles||0; t.shows+=l.shows||0; t.pitched+=l.pitched||0;
     t.closed+=l.closed||0; t.cash+=l.cash||0; t.revenue+=l.revenue||0;
+    // Commission: prefer explicit dollar amount, otherwise compute from rate × cash.
+    const dailyComm = (l.commission && +l.commission > 0)
+      ? +l.commission
+      : ((l.commissionRate||0) * (l.cash||0) / 100);
+    t.commission += dailyComm;
     if((l.cash||0)>t.best) t.best=l.cash||0;
   });
   t.connectRate = t.dials   ? t.pickups/t.dials*100   : 0;
@@ -558,9 +565,7 @@ function agg(logs){
   t.showPitch   = t.shows   ? t.pitched/t.shows*100   : 0;
   t.pitchClose  = t.pitched ? t.closed/t.pitched*100  : 0;
   t.fumbleRate  = t.sets    ? t.fumbles/t.sets*100    : 0;
-  t.commission  = t.pitched * 50;
-  // Aliases so legacy callers that still reference closer terms compile.
-  // `calls` ≈ dials, `closeRate` ≈ pitchClose, `offers` ≈ pitched, `comm` ≈ commission.
+  // Aliases for any legacy closer-term callers that still reference them.
   t.calls=t.dials; t.closeRate=t.pitchClose; t.offers=t.pitched; t.comm=t.commission;
   t.cashPerClose=t.closed?t.cash/t.closed:0;
   return t;
@@ -801,7 +806,7 @@ function renderOverview(){
     ${metric('a-violet','close','Pitch→Close',pct(m.pitchClose),m.closed+' of '+m.pitched+' pitches')}
     ${metric('a-green','cash','Cash Collected',money(m.cash),'across '+m.days+' day'+(m.days===1?'':'s')+' this month')}
     ${metric('a-amber','cash','Revenue Generated',money(m.revenue),"this month's pipeline")}
-    ${metric('a-violet','comm','Commissions Made',money(m.commission),m.pitched+' pitched × $50')}
+    ${metric('a-violet','comm','Commissions Made',money(m.commission),'across '+m.days+' day'+(m.days===1?'':'s'))}
   </div>
 
   <div class="grid g2" style="margin-top:16px">
@@ -909,7 +914,7 @@ function renderLog(date,editId){
   const d=date||todayStr();
   const existing=editId?Store.logs(u.id).find(l=>l.id===editId):Store.logs(u.id).find(l=>l.date===d);
   // Setter log shape: dials, pickups, convos, dq, sets, fumbles, shows, pitched, closed, cash, revenue, notes
-  const e=existing||{dials:'',pickups:'',convos:'',dq:'',sets:'',fumbles:'',shows:'',pitched:'',closed:'',cash:'',revenue:'',notes:''};
+  const e=existing||{dials:'',pickups:'',convos:'',dq:'',sets:'',fumbles:'',shows:'',pitched:'',closed:'',cash:'',revenue:'',commission:'',commissionRate:'',notes:''};
   document.getElementById('view').innerHTML=`
   <div class="page-head"><div style="display:flex;gap:14px;align-items:center">
     <div class="title-icon">${SVG.log}</div>
@@ -957,6 +962,14 @@ function renderLog(date,editId){
         </div>
       </div>
       <div class="form-card">
+        <h4 style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;font-weight:700">💵 Commission</h4>
+        <div class="card-sub" style="margin-bottom:12px">Enter the dollar amount you earned <b>or</b> the % your offer pays you (auto-calculates from Cash Collected). Filling both prefers the dollar amount.</div>
+        <div class="form-grid">
+          <div><div class="fl">$ Commission Made</div><input class="finput num" type="number" min="0" step="0.01" id="lCommission" value="${e.commission}" placeholder="0" oninput="liveStats()"></div>
+          <div><div class="fl">Or Commission Rate (%)</div><input class="finput num" type="number" min="0" max="100" step="0.01" id="lCommissionRate" value="${e.commissionRate}" placeholder="e.g. 10" oninput="liveStats()"></div>
+        </div>
+      </div>
+      <div class="form-card">
         <h4 style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;font-weight:700">Notes</h4>
         <textarea class="finput" id="lNotes" rows="3" placeholder="What went well? What to improve tomorrow?">${e.notes||''}</textarea>
       </div>
@@ -981,11 +994,14 @@ function renderLog(date,editId){
 }
 function liveStats(){
   const n=id=>+document.getElementById(id).value||0;
-  const sets=n('lSets'),shows=n('lShows'),pitched=n('lPitched'),closed=n('lClosed');
+  const sets=n('lSets'),shows=n('lShows'),pitched=n('lPitched'),closed=n('lClosed'),cash=n('lCash');
+  const directComm=n('lCommission'), rate=n('lCommissionRate');
+  // Dollar amount wins if both are entered; otherwise compute rate × cash.
+  const comm = directComm>0 ? directComm : (rate*cash/100);
   document.getElementById('sShow').textContent=sets?pct(shows/sets*100):'—';
   document.getElementById('sShowPitch').textContent=shows?pct(pitched/shows*100):'—';
   document.getElementById('sPitchClose').textContent=pitched?pct(closed/pitched*100):'—';
-  document.getElementById('sComm').textContent='$'+(pitched*50).toLocaleString();
+  document.getElementById('sComm').textContent='$'+comm.toLocaleString(undefined,{maximumFractionDigits:2});
 }
 function saveLogForm(editId){
   const u=Store.current(); const n=id=>+document.getElementById(id).value||0;
@@ -995,6 +1011,7 @@ function saveLogForm(editId){
     dials:n('lDials'), pickups:n('lPickups'), convos:n('lConvos'), dq:n('lDq'),
     sets:n('lSets'), fumbles:n('lFumbles'), shows:n('lShows'), pitched:n('lPitched'),
     closed:n('lClosed'), cash:n('lCash'), revenue:n('lRevenue'),
+    commission:n('lCommission'), commissionRate:n('lCommissionRate'),
     notes:document.getElementById('lNotes').value.trim()
   };
   Store.saveLog(u.id,entry);
