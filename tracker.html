@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yelson — 90D Habit Tracker</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#070610;--bg2:#14111f;--bg3:#1b1729;
+  --text:#f3f1fa;--text2:#a09aba;--text3:#6f6a8a;
+  --border:rgba(255,255,255,0.09);--border2:rgba(255,255,255,0.16);
+  --accent:#9b6dff;--accent-bg:rgba(155,109,255,0.15);
+  --check:#8b5cf6;--success:#34d399;--warn:#f59e0b;--danger:#f87171;
+  --radius:10px;--radius-lg:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh;}
+
+/* ── VIEWS ── */
+#mainView,#goalView{width:100%;}
+#goalView{display:none;}
+
+/* ── COVER ── */
+.cover{height:200px;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 30%,#0f3460 60%,#533483 100%);background-size:cover;background-position:center;position:relative;overflow:hidden;display:flex;align-items:flex-end;padding:0 40px 22px;}
+.cover::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,rgba(83,52,131,0.55),transparent 60%),radial-gradient(ellipse at 70% 30%,rgba(37,99,235,0.35),transparent 50%);pointer-events:none;}
+.cover-title{font-size:52px;font-weight:700;color:rgba(255,255,255,0.95);letter-spacing:-1px;position:relative;z-index:1;text-shadow:0 2px 20px rgba(0,0,0,0.45);}
+.cover-badges{position:absolute;top:16px;left:40px;display:flex;gap:8px;z-index:1;align-items:center;flex-wrap:wrap;}
+.badge{font-size:11px;font-weight:600;letter-spacing:0.5px;color:rgba(255,255,255,0.85);background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);padding:3px 10px;border-radius:20px;text-transform:uppercase;display:inline-flex;align-items:center;gap:5px;cursor:pointer;transition:background 0.15s;}
+.badge:hover{background:rgba(255,255,255,0.28);}
+.badge .badge-del{opacity:0;font-size:12px;line-height:1;margin-left:2px;transition:opacity 0.15s;}
+.badge:hover .badge-del{opacity:1;}
+.badge-input{font-size:11px;font-weight:600;letter-spacing:0.5px;color:rgba(255,255,255,0.95);background:rgba(255,255,255,0.22);border:1px solid rgba(255,255,255,0.55);padding:3px 10px;border-radius:20px;text-transform:uppercase;outline:none;width:90px;font-family:inherit;}
+.badge-add{font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);background:transparent;border:1px dashed rgba(255,255,255,0.35);padding:3px 10px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:background 0.15s,color 0.15s;}
+.badge-add:hover{background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.9);}
+.cover-upload-btn{position:absolute;bottom:14px;right:16px;z-index:2;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.9);background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:5px 12px;cursor:pointer;transition:background 0.15s;}
+.cover-upload-btn:hover{background:rgba(0,0,0,0.55);}
+.cover-upload-btn i{font-size:14px;}
+#coverFileInput{display:none;}
+
+/* ── MAIN ── */
+.main{max-width:1100px;margin:0 auto;padding:0 24px 60px;}
+
+/* ── PAGE HEADER ── */
+.page-header{display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;border-bottom:1px solid var(--border);margin-bottom:20px;}
+.breadcrumb{font-size:13px;color:var(--text2);display:flex;align-items:center;gap:6px;}
+.breadcrumb span{color:var(--text3);}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;padding:6px 14px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);cursor:pointer;transition:background 0.15s,border-color 0.15s;}
+.btn:hover{background:var(--bg2);}
+.btn-primary{background:var(--accent);color:white;border-color:transparent;}
+.btn-primary:hover{opacity:0.88;background:var(--accent);}
+.btn-week{border-color:var(--warn);color:var(--warn);}
+.btn-week:hover{background:rgba(217,119,6,0.08);}
+.btn-month{border-color:var(--success);color:var(--success);}
+.btn-month:hover{background:rgba(22,163,74,0.08);}
+.btn i{font-size:15px;}
+
+/* ── GOAL ── */
+.goal-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;gap:20px;}
+.goal-icon{font-size:22px;flex-shrink:0;}
+.goal-info{flex:1;}
+.goal-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:2px;}
+.goal-title-link{font-size:15px;font-weight:600;color:var(--text);cursor:pointer;display:inline-flex;align-items:center;gap:6px;border-radius:4px;padding:1px 4px;margin:-1px -4px;transition:background 0.15s,color 0.15s;}
+.goal-title-link:hover{background:var(--accent-bg);color:var(--accent);}
+.goal-title-link .open-icon{font-size:13px;opacity:0;transition:opacity 0.15s;}
+.goal-title-link:hover .open-icon{opacity:1;}
+.goal-meta{font-size:12px;color:var(--text2);margin-top:2px;}
+.goal-stats{display:flex;align-items:center;gap:20px;flex-shrink:0;}
+.stat{text-align:center;}
+.stat-val{font-size:18px;font-weight:700;color:var(--accent);}
+.stat-lbl{font-size:11px;color:var(--text3);}
+.goal-progress-bar{width:160px;flex-shrink:0;}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:4px;}
+.progress-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:3px;background:var(--accent);transition:width 0.3s;}
+
+/* ── SUMMARY CARDS ── */
+.summary-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;}
+.summary-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;}
+.sc-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.sc-val{font-size:22px;font-weight:700;color:var(--text);line-height:1.1;}
+.sc-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+
+/* ── WEEK NAV ── */
+.week-nav{display:flex;align-items:center;gap:8px;margin-bottom:20px;}
+.nav-arrow{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;flex-shrink:0;font-size:16px;transition:background 0.15s;}
+.nav-arrow:hover{background:var(--bg2);color:var(--text);}
+.week-tabs{display:flex;gap:4px;flex:1;overflow-x:auto;}
+.week-tabs::-webkit-scrollbar{display:none;}
+.day-tab{display:flex;flex-direction:column;align-items:center;padding:6px 10px;border-radius:var(--radius);cursor:pointer;border:1px solid transparent;transition:background 0.15s,border-color 0.15s;min-width:52px;flex-shrink:0;}
+.day-tab:hover{background:var(--bg2);}
+.day-tab.active{background:var(--accent-bg);border-color:var(--accent);}
+.day-tab .day-name{font-size:10px;font-weight:600;text-transform:uppercase;color:var(--text3);letter-spacing:0.5px;}
+.day-tab.active .day-name{color:var(--accent);}
+.day-tab .day-num{font-size:16px;font-weight:600;color:var(--text);line-height:1.2;}
+.day-tab.active .day-num{color:var(--accent);}
+.day-tab.today .day-num{background:var(--accent);color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;}
+
+/* ── TABLE ── */
+.table-wrapper{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-lg);}
+table{width:100%;border-collapse:collapse;min-width:700px;}
+thead th{background:var(--bg2);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:2;}
+thead th.center{text-align:center;}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--bg2);}
+td{padding:10px 14px;vertical-align:middle;}
+td.center{text-align:center;}
+.habit-name{display:flex;align-items:center;gap:10px;min-width:200px;}
+.habit-icon{width:28px;height:28px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;color:var(--text2);}
+.habit-text{font-size:13px;font-weight:500;color:var(--text);line-height:1.3;}
+.habit-actions{display:none;gap:4px;margin-left:auto;}
+tbody tr:hover .habit-actions{display:flex;}
+.action-btn{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:4px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-size:14px;transition:background 0.15s,color 0.15s;}
+.action-btn:hover{background:var(--bg3);color:var(--text);}
+.action-btn.del:hover{background:#fef2f2;color:var(--danger);}
+.progress-ring{position:relative;width:36px;height:36px;flex-shrink:0;}
+.progress-ring svg{transform:rotate(-90deg);}
+.progress-ring .ring-track{fill:none;stroke:var(--border2);stroke-width:3;}
+.progress-ring .ring-fill{fill:none;stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset 0.4s;}
+.progress-ring .ring-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--text2);}
+.habit-check{appearance:none;width:20px;height:20px;border:2px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;position:relative;transition:border-color 0.15s,background 0.15s;margin:0 auto;display:block;}
+.habit-check:hover{border-color:var(--check);}
+.habit-check:checked{background:var(--check);border-color:var(--check);}
+.habit-check:checked::after{content:'';position:absolute;left:4px;top:1px;width:8px;height:12px;border:2px solid white;border-top:none;border-left:none;transform:rotate(45deg);}
+.per-week{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:2px 10px;white-space:nowrap;}
+.footer-row td{background:var(--bg2);font-size:12px;font-weight:600;color:var(--text2);border-top:2px solid var(--border2);}
+.col-pct{font-size:13px;font-weight:700;text-align:center;}
+.pct-high{color:var(--success);}.pct-mid{color:var(--warn);}.pct-low{color:var(--danger);}
+.add-row td{padding:8px 14px;background:var(--bg);}
+.add-habit-btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text3);background:none;border:none;cursor:pointer;padding:4px 0;border-radius:4px;transition:color 0.15s;}
+.add-habit-btn:hover{color:var(--accent);}
+
+/* ── HABIT MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--bg);border-radius:var(--radius-lg);padding:24px;width:420px;max-width:calc(100vw - 40px);box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:16px;}
+.form-group{margin-bottom:14px;}
+.form-label{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;}
+.form-input{width:100%;padding:8px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;background:var(--bg2);color:var(--text);outline:none;transition:border-color 0.15s;font-family:inherit;}
+.form-input:focus{border-color:var(--accent);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.icon-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;}
+.icon-option{width:32px;height:32px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:background 0.15s,border-color 0.15s;color:var(--text2);}
+.icon-option:hover,.icon-option.selected{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;}
+
+/* ══════════════════════════════════════════
+   ACCOUNTABILITY OVERLAY
+══════════════════════════════════════════ */
+.acct-overlay{
+  display:none;position:fixed;inset:0;z-index:300;
+  background:rgba(0,0,0,0.6);
+  overflow-y:auto;
+}
+.acct-overlay.open{display:block;}
+.acct-panel{
+  background:var(--bg);
+  min-height:100vh;
+  max-width:900px;
+  margin:0 auto;
+  padding:0 0 80px;
+  position:relative;
+}
+
+/* acct header band */
+.acct-header{
+  padding:28px 40px 24px;
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:10;
+  background:var(--bg);
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;
+}
+.acct-header-left{display:flex;flex-direction:column;gap:4px;}
+.acct-type-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;
+  padding:3px 10px;border-radius:20px;
+  margin-bottom:2px;width:fit-content;
+}
+.acct-type-badge.week{background:rgba(217,119,6,0.12);color:var(--warn);}
+.acct-type-badge.month{background:rgba(22,163,74,0.12);color:var(--success);}
+.acct-title{font-size:22px;font-weight:700;color:var(--text);}
+.acct-subtitle{font-size:13px;color:var(--text3);}
+.acct-close{
+  display:flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:50%;
+  border:1px solid var(--border);background:var(--bg2);
+  font-size:18px;color:var(--text2);cursor:pointer;
+  transition:background 0.15s,color 0.15s;flex-shrink:0;
+}
+.acct-close:hover{background:var(--bg3);color:var(--text);}
+
+/* acct body */
+.acct-body{padding:32px 40px;}
+
+/* score hero */
+.acct-score-hero{
+  display:flex;align-items:center;gap:32px;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius-lg);padding:24px 28px;
+  margin-bottom:32px;
+}
+.acct-score-ring{position:relative;width:88px;height:88px;flex-shrink:0;}
+.acct-score-ring svg{transform:rotate(-90deg);}
+.acct-score-ring .ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.acct-score-ring .ring-pct{font-size:20px;font-weight:700;color:var(--text);}
+.acct-score-ring .ring-lbl{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;}
+.acct-score-info{flex:1;}
+.acct-score-grade{font-size:32px;font-weight:700;margin-bottom:4px;}
+.acct-score-msg{font-size:14px;color:var(--text2);line-height:1.5;}
+.acct-kpis{display:flex;gap:24px;margin-left:auto;flex-shrink:0;}
+.acct-kpi{text-align:center;}
+.acct-kpi-val{font-size:20px;font-weight:700;color:var(--accent);}
+.acct-kpi-lbl{font-size:11px;color:var(--text3);}
+
+/* section heading */
+.acct-section{margin-bottom:32px;}
+.acct-section-title{
+  font-size:12px;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.6px;color:var(--text3);
+  margin-bottom:14px;display:flex;align-items:center;gap:8px;
+}
+.acct-section-title i{font-size:15px;}
+
+/* habit rows */
+.acct-habit-row{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 16px;
+  margin-bottom:8px;
+}
+.acct-habit-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.acct-habit-icon{width:28px;height:28px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;color:var(--text2);}
+.acct-habit-name{flex:1;font-size:13px;font-weight:600;color:var(--text);}
+.acct-habit-pct{font-size:13px;font-weight:700;}
+.acct-bar-track{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;margin-bottom:8px;}
+.acct-bar-fill{height:100%;border-radius:4px;transition:width 0.5s ease;}
+
+/* day dots row */
+.acct-dots{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.acct-dot{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+.acct-dot-circle{
+  width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;
+  border:2px solid var(--border2);
+  color:var(--text3);
+}
+.acct-dot-circle.done{background:var(--check);border-color:var(--check);color:white;}
+.acct-dot-circle.missed{background:var(--bg3);border-color:var(--border);}
+.acct-dot-label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;}
+
+/* month grid: weeks × habits */
+.month-grid-wrap{overflow-x:auto;}
+.month-grid{border-collapse:collapse;width:100%;min-width:500px;}
+.month-grid th{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text3);padding:6px 10px;text-align:center;border-bottom:1px solid var(--border);}
+.month-grid th.habit-col{text-align:left;min-width:180px;}
+.month-grid td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle;}
+.month-grid td.habit-col{text-align:left;}
+.month-grid tr:last-child td{border-bottom:none;}
+.month-cell{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:48px;height:26px;border-radius:20px;
+  font-size:11px;font-weight:700;
+}
+.mcell-high{background:rgba(22,163,74,0.15);color:var(--success);}
+.mcell-mid{background:rgba(217,119,6,0.13);color:var(--warn);}
+.mcell-low{background:rgba(220,38,38,0.12);color:var(--danger);}
+.mcell-zero{background:var(--bg3);color:var(--text3);}
+
+/* compare badge */
+.compare-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;
+}
+.compare-up{background:rgba(22,163,74,0.15);color:var(--success);}
+.compare-dn{background:rgba(220,38,38,0.12);color:var(--danger);}
+.compare-eq{background:var(--bg3);color:var(--text3);}
+
+/* best/worst chips */
+.insight-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+.insight-chip{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;padding:6px 12px;
+  border-radius:var(--radius);border:1px solid var(--border);
+  background:var(--bg2);color:var(--text2);
+}
+.insight-chip i{font-size:14px;}
+.chip-gold{border-color:rgba(217,119,6,0.4);color:var(--warn);}
+.chip-red{border-color:rgba(220,38,38,0.3);color:var(--danger);}
+
+/* ══════════════════════════════════════════
+   GOAL PAGE
+══════════════════════════════════════════ */
+#goalView{display:none;min-height:100vh;background:var(--bg);}
+.gv-cover{height:200px;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 30%,#0f3460 60%,#533483 100%);background-size:cover;background-position:center;position:relative;overflow:hidden;display:flex;align-items:flex-end;padding:0 48px 22px;}
+.gv-cover::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,rgba(83,52,131,0.55),transparent 60%),radial-gradient(ellipse at 70% 30%,rgba(37,99,235,0.35),transparent 50%);pointer-events:none;}
+.gv-cover-title{font-size:44px;font-weight:700;color:rgba(255,255,255,0.95);letter-spacing:-1px;position:relative;z-index:1;text-shadow:0 2px 20px rgba(0,0,0,0.45);}
+.gv-topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 48px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:10;}
+.gv-back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--text2);background:none;border:none;cursor:pointer;border-radius:6px;padding:5px 10px;transition:background 0.15s,color 0.15s;}
+.gv-back:hover{background:var(--bg2);color:var(--text);}
+.gv-topbar-right{display:flex;gap:8px;}
+.gv-body{max-width:800px;margin:0 auto;padding:32px 48px 80px;}
+.gv-goal-name{font-size:28px;font-weight:700;color:var(--text);line-height:1.25;margin-bottom:6px;border:none;background:transparent;outline:none;width:100%;resize:none;font-family:inherit;}
+.gv-goal-name::placeholder{color:var(--text3);}
+.gv-goal-meta{display:flex;align-items:center;gap:16px;margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.gv-start-date{background:var(--bg2);color:var(--text2);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;font-family:inherit;font-size:12px;margin-left:6px;color-scheme:dark;outline:none;cursor:pointer;}
+.gv-start-date:focus{border-color:var(--accent);}
+.gv-meta-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);}
+.gv-meta-item strong{color:var(--text2);font-weight:600;}
+.gv-section{margin-bottom:36px;}
+.gv-section-header{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.gv-section-title{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--text3);}
+.gv-section-icon{font-size:16px;color:var(--text3);}
+.gv-textarea{width:100%;min-height:120px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--bg2);color:var(--text);font-size:14px;font-family:inherit;line-height:1.7;resize:vertical;outline:none;transition:border-color 0.15s;}
+.gv-textarea:focus{border-color:var(--accent);}
+.gv-textarea::placeholder{color:var(--text3);}
+.milestones-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+.milestone-item{display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;}
+.milestone-num{width:24px;height:24px;border-radius:50%;background:var(--accent-bg);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.milestone-input{flex:1;border:none;background:transparent;font-size:13px;color:var(--text);outline:none;font-family:inherit;}
+.milestone-input::placeholder{color:var(--text3);}
+.milestone-del{border:none;background:none;cursor:pointer;color:var(--text3);font-size:16px;border-radius:4px;padding:2px 4px;transition:color 0.15s,background 0.15s;}
+.milestone-del:hover{color:var(--danger);background:#fef2f2;}
+.add-milestone-btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text3);background:none;border:2px dashed var(--border2);border-radius:var(--radius);padding:8px 14px;cursor:pointer;width:100%;transition:border-color 0.15s,color 0.15s;}
+.add-milestone-btn:hover{border-color:var(--accent);color:var(--accent);}
+.gv-habits{display:flex;flex-direction:column;gap:6px;}
+.gv-habit-row{display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;transition:border-color 0.15s;}
+.gv-habit-row:hover{border-color:var(--border2);}
+.gv-habit-icon{width:28px;height:28px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;color:var(--text2);}
+.gv-habit-name{flex:1;font-size:13px;font-weight:500;color:var(--text);}
+.gv-habit-target{font-size:12px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:2px 10px;}
+.gv-add-habit-btn{display:flex;align-items:center;gap:8px;background:none;border:2px dashed var(--border2);border-radius:var(--radius);padding:10px 14px;cursor:pointer;width:100%;margin-top:4px;font-size:13px;color:var(--text3);transition:border-color 0.15s,color 0.15s;}
+.gv-add-habit-btn:hover{border-color:var(--accent);color:var(--accent);}
+.gv-progress-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px;}
+.gv-prog-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;text-align:center;}
+.gv-prog-val{font-size:20px;font-weight:700;color:var(--accent);}
+.gv-prog-lbl{font-size:11px;color:var(--text3);margin-top:2px;}
+</style>
+</head>
+<body>
+
+<!-- ═══ MAIN DASHBOARD ═══ -->
+<div id="mainView">
+  <div class="cover" id="mainCover">
+    <div class="cover-badges" id="coverBadges"></div>
+    <div class="cover-title">Yelson</div>
+    <label class="cover-upload-btn" for="coverFileInput" title="Upload cover photo">
+      <i class="ti ti-photo" aria-hidden="true"></i> Change cover
+    </label>
+    <input type="file" id="coverFileInput" accept="image/*" onchange="uploadCover(event)">
+  </div>
+
+  <div class="main">
+    <div class="page-header">
+      <div class="breadcrumb">
+        <i class="ti ti-target" style="font-size:16px" aria-hidden="true"></i>
+        90D Plan <span>/</span> Goals &amp; Habits
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-week" onclick="openAcct('week')">
+          <i class="ti ti-chart-bar" aria-hidden="true"></i> Last week
+        </button>
+        <button class="btn btn-month" onclick="openAcct('month')">
+          <i class="ti ti-calendar-stats" aria-hidden="true"></i> Last month
+        </button>
+        <button class="btn" onclick="exportData()"><i class="ti ti-download" aria-hidden="true"></i> Export</button>
+        <button class="btn btn-primary" onclick="openModal()"><i class="ti ti-plus" aria-hidden="true"></i> New habit</button>
+      </div>
+    </div>
+
+    <!-- GOAL -->
+    <div class="goal-section">
+      <div class="goal-icon">⭐</div>
+      <div class="goal-info">
+        <div class="goal-label">Primary Goal</div>
+        <div>
+          <a class="goal-title-link" onclick="openGoalPage()">
+            <span id="goalTitleDisplay">Earn $6,780K+ P/M + move to Medellín</span>
+            <i class="ti ti-arrow-up-right open-icon" aria-hidden="true"></i>
+          </a>
+        </div>
+        <div class="goal-meta">90-day sprint · Started May 2026</div>
+      </div>
+      <div class="goal-stats">
+        <div class="stat"><div class="stat-val" id="statStreak">0</div><div class="stat-lbl">Day streak</div></div>
+        <div class="stat"><div class="stat-val" id="statCompleted">0</div><div class="stat-lbl">Done today</div></div>
+      </div>
+      <div class="goal-progress-bar">
+        <div class="progress-label"><span>Overall progress</span><span id="overallPct">0%</span></div>
+        <div class="progress-track"><div class="progress-fill" id="overallBar" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="summary-cards">
+      <div class="summary-card"><div class="sc-label"><i class="ti ti-check" style="font-size:13px" aria-hidden="true"></i> Today</div><div class="sc-val" id="scToday">—</div><div class="sc-sub">habits completed</div></div>
+      <div class="summary-card"><div class="sc-label"><i class="ti ti-calendar-week" style="font-size:13px" aria-hidden="true"></i> This week</div><div class="sc-val" id="scWeek">—</div><div class="sc-sub">total check-ins</div></div>
+      <div class="summary-card"><div class="sc-label"><i class="ti ti-flame" style="font-size:13px" aria-hidden="true"></i> Best habit</div><div class="sc-val" id="scBest" style="font-size:14px;padding-top:4px">—</div><div class="sc-sub" id="scBestPct"></div></div>
+      <div class="summary-card"><div class="sc-label"><i class="ti ti-list-check" style="font-size:13px" aria-hidden="true"></i> Habits</div><div class="sc-val" id="scTotal">—</div><div class="sc-sub">being tracked</div></div>
+    </div>
+
+    <!-- WEEK NAV -->
+    <div class="week-nav">
+      <button class="nav-arrow" onclick="shiftWeek(-1)" aria-label="Previous week"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
+      <div class="week-tabs" id="weekTabs"></div>
+      <button class="nav-arrow" onclick="shiftWeek(1)" aria-label="Next week"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:220px">Habit</th>
+            <th class="center" style="width:60px">Progress</th>
+            <th class="center" id="th0" style="width:48px">Mon</th>
+            <th class="center" id="th1" style="width:48px">Tue</th>
+            <th class="center" id="th2" style="width:48px">Wed</th>
+            <th class="center" id="th3" style="width:48px">Thu</th>
+            <th class="center" id="th4" style="width:48px">Fri</th>
+            <th class="center" id="th5" style="width:48px">Sat</th>
+            <th class="center" id="th6" style="width:48px">Sun</th>
+            <th class="center" style="width:90px">Per Week</th>
+          </tr>
+        </thead>
+        <tbody id="habitBody"></tbody>
+        <tfoot id="habitFoot"></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ GOAL PLANNING PAGE ═══ -->
+<div id="goalView">
+  <div class="gv-cover" id="gvCover"><div class="gv-cover-title">Yelson</div></div>
+  <div class="gv-topbar">
+    <button class="gv-back" onclick="closeGoalPage()"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back to dashboard</button>
+    <div class="gv-topbar-right"><button class="btn" onclick="saveGoalPage()"><i class="ti ti-device-floppy" aria-hidden="true"></i> Save</button></div>
+  </div>
+  <div class="gv-body">
+    <textarea class="gv-goal-name" id="gvGoalName" rows="2" placeholder="What is your #1 goal for the next 90 days?"></textarea>
+    <div class="gv-goal-meta">
+      <div class="gv-meta-item"><i class="ti ti-calendar" aria-hidden="true"></i> <strong id="gvDaysLeft">90</strong>&nbsp;days left <input type="date" id="gvStartDate" class="gv-start-date" title="When does the 90-day challenge start?" onchange="updateStartDate(this.value)"></div>
+      <div class="gv-meta-item"><i class="ti ti-list-check" aria-hidden="true"></i> <strong id="gvHabitCount">0</strong>&nbsp;habits</div>
+      <div class="gv-meta-item"><i class="ti ti-chart-bar" aria-hidden="true"></i> <strong id="gvOverallPct">0%</strong>&nbsp;overall</div>
+    </div>
+    <div class="gv-section">
+      <div class="gv-section-header"><i class="ti ti-chart-line gv-section-icon" aria-hidden="true"></i><span class="gv-section-title">Progress overview</span></div>
+      <div class="gv-progress-grid" id="gvProgressGrid"></div>
+    </div>
+    <div class="gv-section">
+      <div class="gv-section-header"><i class="ti ti-flame gv-section-icon" aria-hidden="true"></i><span class="gv-section-title">Why this goal?</span></div>
+      <textarea class="gv-textarea" id="gvWhy" placeholder="What drives you? Why does this goal matter on a deep level?"></textarea>
+    </div>
+    <div class="gv-section">
+      <div class="gv-section-header"><i class="ti ti-map gv-section-icon" aria-hidden="true"></i><span class="gv-section-title">90-Day plan</span></div>
+      <textarea class="gv-textarea" id="gvPlan" style="min-height:200px" placeholder="Write your full 90-day plan. What does each month look like?"></textarea>
+    </div>
+    <div class="gv-section">
+      <div class="gv-section-header"><i class="ti ti-flag gv-section-icon" aria-hidden="true"></i><span class="gv-section-title">Milestones</span></div>
+      <div class="milestones-list" id="milestonesList"></div>
+      <button class="add-milestone-btn" onclick="addMilestone()"><i class="ti ti-plus" aria-hidden="true"></i> Add milestone</button>
+    </div>
+    <div class="gv-section">
+      <div class="gv-section-header"><i class="ti ti-repeat gv-section-icon" aria-hidden="true"></i><span class="gv-section-title">Habits that drive this goal</span></div>
+      <p style="font-size:13px;color:var(--text3);margin-bottom:12px;">Daily actions that compound into your goal.</p>
+      <div class="gv-habits" id="gvHabitsList"></div>
+      <button class="gv-add-habit-btn" onclick="closeGoalPage();openModal();"><i class="ti ti-plus" aria-hidden="true"></i> Add a new habit</button>
+    </div>
+    <div class="gv-section">
+      <div class="gv-section-header"><i class="ti ti-user gv-section-icon" aria-hidden="true"></i><span class="gv-section-title">Identity statement</span></div>
+      <textarea class="gv-textarea" id="gvIdentity" placeholder='Who do you need to become? Write in present tense.'></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ACCOUNTABILITY OVERLAY ═══ -->
+<div class="acct-overlay" id="acctOverlay">
+  <div class="acct-panel">
+    <div class="acct-header">
+      <div class="acct-header-left">
+        <div class="acct-type-badge" id="acctBadge"></div>
+        <div class="acct-title" id="acctTitle"></div>
+        <div class="acct-subtitle" id="acctSubtitle"></div>
+      </div>
+      <button class="acct-close" onclick="closeAcct()" aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button>
+    </div>
+    <div class="acct-body" id="acctBody"></div>
+  </div>
+</div>
+
+<!-- ═══ HABIT MODAL ═══ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Add New Habit</div>
+    <div class="form-group">
+      <label class="form-label">Habit name</label>
+      <input class="form-input" id="habitNameInput" type="text" placeholder="e.g. Morning workout">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Target (times/week)</label>
+        <input class="form-input" id="habitTargetInput" type="number" min="1" max="7" value="7">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Icon</label>
+        <div class="icon-grid" id="iconGrid"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveHabit()">Add Habit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ICONS=['ti-sun','ti-brain','ti-phone','ti-book','ti-device-laptop','ti-moon','ti-barbell','ti-salad','ti-droplet','ti-writing','ti-headphones','ti-home','ti-chart-line','ti-music','ti-heart','ti-run'];
+const DAY_NAMES=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+let habits=[
+  {id:1,name:'Wake without snoozing',icon:'ti-sun',target:7,checks:{}},
+  {id:2,name:'WGS Scroll + GC+ Meditate',icon:'ti-brain',target:7,checks:{}},
+  {id:3,name:'300+ Dials or Set 3+ sets',icon:'ti-phone',target:6,checks:{}},
+  {id:4,name:'1H sales training | Practice | Listen',icon:'ti-headphones',target:7,checks:{}},
+  {id:5,name:'Work with No Distractions',icon:'ti-device-laptop',target:6,checks:{}},
+  {id:6,name:'No Entertainment — just learning',icon:'ti-book',target:7,checks:{}},
+  {id:7,name:'Lyft 4H+',icon:'ti-run',target:5,checks:{}},
+  {id:8,name:'Sleep on time + Alchemist journal',icon:'ti-moon',target:7,checks:{}},
+];
+let nextId=9,weekOffset=0,selectedIcon='ti-sun',editingId=null;
+let goalData={
+  title:'Earn $6,780K+ P/M + move to Medellín',why:'',plan:'',identity:'',
+  badges:['#1 Closer','Leader','Marketer'],
+  milestones:[
+    {id:1,text:'Month 1 — Build foundation: 100% habit consistency'},
+    {id:2,text:'Month 2 — Scale: $3K/month, 200+ dials/day'},
+    {id:3,text:'Month 3 — Hit $6,780K+, book flight to Medellín'},
+  ],
+  startDate:'2026-05-01',coverImage:null
+};
+let nextMilestoneId=4;
+
+/* ── helpers ── */
+function dateKey(d){return d.toISOString().slice(0,10);}
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function pctColor(p){return p>=70?'var(--success)':p>=40?'var(--warn)':'var(--danger)';}
+
+function getWeekDates(offsetWeeks=0){
+  const now=new Date();const day=now.getDay();
+  const mon=new Date(now);mon.setDate(now.getDate()-((day+6)%7)+offsetWeeks*7);mon.setHours(0,0,0,0);
+  return Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return d;});
+}
+
+/* Week of arbitrary Monday */
+function getWeekFromMonday(monday){
+  return Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d;});
+}
+
+/* ── Editable badges ── */
+function renderBadges(){
+  const container=document.getElementById('coverBadges');
+  container.innerHTML='';
+  goalData.badges.forEach((text,i)=>{
+    const span=document.createElement('span');
+    span.className='badge';
+    span.title='Click to edit';
+    span.innerHTML=`${escHtml(text)}<span class="badge-del" onclick="deleteBadge(event,${i})" title="Remove">✕</span>`;
+    span.addEventListener('click',e=>{if(!e.target.classList.contains('badge-del'))startEditBadge(i,span,text);});
+    container.appendChild(span);
+  });
+  /* add button — only shown when fewer than 3 badges */
+  if(goalData.badges.length<3){
+    const add=document.createElement('button');
+    add.className='badge-add';
+    add.innerHTML='<i class="ti ti-plus" style="font-size:11px" aria-hidden="true"></i> Add';
+    add.onclick=()=>addBadge();
+    container.appendChild(add);
+  }
+}
+
+function startEditBadge(i,span,currentText){
+  const input=document.createElement('input');
+  input.className='badge-input';
+  input.type='text';
+  input.value=currentText;
+  input.maxLength=20;
+  span.replaceWith(input);
+  input.focus();input.select();
+  function commit(){
+    const val=input.value.trim();
+    if(val){goalData.badges[i]=val;}
+    saveData();renderBadges();
+  }
+  input.addEventListener('blur',commit);
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();commit();}
+    if(e.key==='Escape'){renderBadges();}
+  });
+}
+
+function deleteBadge(e,i){
+  e.stopPropagation();
+  goalData.badges.splice(i,1);
+  saveData();renderBadges();
+}
+
+function addBadge(){
+  if(goalData.badges.length>=3)return;
+  goalData.badges.push('New label');
+  saveData();renderBadges();
+  /* immediately open the new badge for editing */
+  const spans=document.querySelectorAll('#coverBadges .badge');
+  const last=spans[spans.length-1];
+  if(last)last.click();
+}
+
+/* ── Cover upload ── */
+function uploadCover(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    const url=ev.target.result;
+    document.getElementById('mainCover').style.backgroundImage=`url(${url})`;
+    document.getElementById('gvCover').style.backgroundImage=`url(${url})`;
+    goalData.coverImage=url;saveData();
+  };
+  r.readAsDataURL(file);
+}
+
+/* ══════════════════════════
+   ACCOUNTABILITY VIEWS
+══════════════════════════ */
+function openAcct(type){
+  const overlay=document.getElementById('acctOverlay');
+  const badge=document.getElementById('acctBadge');
+  const title=document.getElementById('acctTitle');
+  const subtitle=document.getElementById('acctSubtitle');
+  const body=document.getElementById('acctBody');
+
+  if(type==='week'){
+    /* ── PREVIOUS WEEK ── */
+    const prevDates=getWeekDates(-1);
+    const mon=prevDates[0],sun=prevDates[6];
+    const fmtOpts={month:'short',day:'numeric'};
+    const rangeStr=mon.toLocaleDateString('en-US',fmtOpts)+' – '+sun.toLocaleDateString('en-US',{...fmtOpts,year:'numeric'});
+
+    badge.className='acct-type-badge week';
+    badge.innerHTML='<i class="ti ti-calendar-week" aria-hidden="true"></i> Weekly review';
+    title.textContent='Last week';
+    subtitle.textContent=rangeStr;
+
+    /* compute stats */
+    let totalDone=0,totalPossible=0;
+    const habitStats=habits.map(h=>{
+      let done=0;
+      prevDates.forEach(d=>{if(h.checks[dateKey(d)])done++;});
+      totalDone+=done;totalPossible+=h.target;
+      return {...h,done,pct:h.target>0?Math.round((done/h.target)*100):0,dates:prevDates};
+    });
+    const overallPct=totalPossible>0?Math.round((totalDone/totalPossible)*100):0;
+
+    /* compare to week before last */
+    const prevPrevDates=getWeekDates(-2);
+    let pp=0,ppp=0;
+    habits.forEach(h=>{prevPrevDates.forEach(d=>{if(h.checks[dateKey(d)])pp++;});ppp+=h.target;});
+    const prevPct=ppp>0?Math.round((pp/ppp)*100):0;
+    const diff=overallPct-prevPct;
+
+    /* this week for comparison */
+    const thisDates=getWeekDates(0);
+    let tw=0,twp=0;
+    habits.forEach(h=>{thisDates.forEach(d=>{if(h.checks[dateKey(d)])tw++;});twp+=h.target;});
+    const thisPct=twp>0?Math.round((tw/twp)*100):0;
+
+    const best=habitStats.reduce((a,b)=>b.pct>a.pct?b:a,habitStats[0]);
+    const worst=habitStats.reduce((a,b)=>b.pct<a.pct?b:a,habitStats[0]);
+    const {grade,msg,gradeColor}=getGrade(overallPct);
+
+    body.innerHTML=buildWeekBody(overallPct,grade,msg,gradeColor,totalDone,totalPossible,diff,prevPct,thisPct,best,worst,habitStats,prevDates);
+
+  } else {
+    /* ── PREVIOUS MONTH ── */
+    const now=new Date();
+    const firstOfLastMonth=new Date(now.getFullYear(),now.getMonth()-1,1);
+    const lastOfLastMonth=new Date(now.getFullYear(),now.getMonth(),0);
+    const monthName=firstOfLastMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+
+    badge.className='acct-type-badge month';
+    badge.innerHTML='<i class="ti ti-calendar-month" aria-hidden="true"></i> Monthly review';
+    title.textContent='Last month';
+    subtitle.textContent=monthName;
+
+    /* build weeks */
+    const weeks=buildMonthWeeks(firstOfLastMonth,lastOfLastMonth);
+
+    let totalDone=0,totalPossible=0;
+    const habitMonthStats=habits.map(h=>{
+      let done=0;
+      const allDays=weeks.flat();
+      allDays.forEach(d=>{if(d&&h.checks[dateKey(d)])done++;});
+      const daysInMonth=lastOfLastMonth.getDate();
+      const expectedDays=Math.round((h.target/7)*daysInMonth);
+      totalDone+=done;totalPossible+=expectedDays;
+      const weekStats=weeks.map(wk=>{
+        let wd=0;wk.forEach(d=>{if(d&&h.checks[dateKey(d)])wd++;});
+        return {done:wd,possible:wk.filter(d=>d).length};
+      });
+      return {...h,done,expected:expectedDays,pct:expectedDays>0?Math.round((done/expectedDays)*100):0,weekStats};
+    });
+
+    const overallPct=totalPossible>0?Math.round((totalDone/totalPossible)*100):0;
+    const{grade,msg,gradeColor}=getGrade(overallPct);
+    const best=habitMonthStats.length?habitMonthStats.reduce((a,b)=>b.pct>a.pct?b:a,habitMonthStats[0]):null;
+    const worst=habitMonthStats.length?habitMonthStats.reduce((a,b)=>b.pct<a.pct?b:a,habitMonthStats[0]):null;
+
+    body.innerHTML=buildMonthBody(overallPct,grade,msg,gradeColor,totalDone,totalPossible,best,worst,habitMonthStats,weeks,firstOfLastMonth);
+  }
+
+  overlay.classList.add('open');
+  overlay.scrollTop=0;
+}
+
+function closeAcct(){document.getElementById('acctOverlay').classList.remove('open');}
+
+/* Build an array of week arrays covering firstOfMonth..lastOfMonth */
+function buildMonthWeeks(first,last){
+  const weeks=[];
+  let cur=new Date(first);
+  /* back up to Monday */
+  const dow=cur.getDay();const back=(dow+6)%7;
+  cur.setDate(cur.getDate()-back);
+  while(cur<=last){
+    const week=[];
+    for(let i=0;i<7;i++){
+      const d=new Date(cur);d.setDate(cur.getDate()+i);
+      week.push((d>=first&&d<=last)?d:null);
+    }
+    weeks.push(week);
+    cur.setDate(cur.getDate()+7);
+  }
+  return weeks;
+}
+
+function getGrade(pct){
+  if(pct>=90)return{grade:'S',msg:'Exceptional — you crushed it! Keep this energy going.',gradeColor:'#7c3aed'};
+  if(pct>=75)return{grade:'A',msg:'Excellent work. Strong consistency across the board.',gradeColor:'var(--success)'};
+  if(pct>=60)return{grade:'B',msg:'Good effort. A few gaps — identify what broke your streak.',gradeColor:'#0891b2'};
+  if(pct>=40)return{grade:'C',msg:'Room to grow. Pick 2 habits and go all-in on them.',gradeColor:'var(--warn)'};
+  return{grade:'D',msg:'Tough week. Reset, recommit, and make this week different.',gradeColor:'var(--danger)'};
+}
+
+/* ── WEEK BODY HTML ── */
+function buildWeekBody(pct,grade,msg,gradeColor,done,possible,diff,prevPct,thisPct,best,worst,habitStats,dates){
+  let cmpBadge='';
+  if(Math.abs(diff)>=1){
+    const cls=diff>0?'compare-up':'compare-dn';
+    const icon=diff>0?'ti-trending-up':'ti-trending-down';
+    cmpBadge=`<span class="compare-badge ${cls}"><i class="ti ${icon}" aria-hidden="true"></i>${diff>0?'+':''}${diff}% vs week before</span>`;
+  } else {
+    cmpBadge=`<span class="compare-badge compare-eq"><i class="ti ti-minus" aria-hidden="true"></i> Same as week before</span>`;
+  }
+
+  /* ring */
+  const r=38,circ=2*Math.PI*r;
+  const offset=circ-(pct/100)*circ;
+
+  let html=`
+  <div class="acct-score-hero">
+    <div class="acct-score-ring">
+      <svg width="88" height="88" viewBox="0 0 88 88">
+        <circle fill="none" stroke="var(--border2)" stroke-width="7" cx="44" cy="44" r="${r}"/>
+        <circle fill="none" stroke="${gradeColor}" stroke-width="7" stroke-linecap="round"
+          cx="44" cy="44" r="${r}"
+          stroke-dasharray="${circ.toFixed(1)}"
+          stroke-dashoffset="${offset.toFixed(1)}"/>
+      </svg>
+      <div class="ring-text">
+        <span class="ring-pct">${pct}%</span>
+        <span class="ring-lbl">done</span>
+      </div>
+    </div>
+    <div class="acct-score-info">
+      <div class="acct-score-grade" style="color:${gradeColor}">${grade}</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:8px;">${escHtml(msg)}</div>
+      ${cmpBadge}
+    </div>
+    <div class="acct-kpis">
+      <div class="acct-kpi"><div class="acct-kpi-val">${done}</div><div class="acct-kpi-lbl">check-ins</div></div>
+      <div class="acct-kpi"><div class="acct-kpi-val">${possible}</div><div class="acct-kpi-lbl">possible</div></div>
+      <div class="acct-kpi"><div class="acct-kpi-val">${thisPct}%</div><div class="acct-kpi-lbl">this week</div></div>
+    </div>
+  </div>`;
+
+  /* insights */
+  html+=`<div class="acct-section">
+    <div class="acct-section-title"><i class="ti ti-sparkles" aria-hidden="true"></i> Insights</div>
+    <div class="insight-chips">`;
+  if(best){html+=`<div class="insight-chip chip-gold"><i class="ti ti-trophy" aria-hidden="true"></i> Best: ${escHtml(best.name)} (${best.pct}%)</div>`;}
+  if(worst&&worst.id!==best?.id){html+=`<div class="insight-chip chip-red"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Needs work: ${escHtml(worst.name)} (${worst.pct}%)</div>`;}
+  const perfectCount=habitStats.filter(h=>h.pct>=100).length;
+  if(perfectCount>0)html+=`<div class="insight-chip" style="border-color:rgba(124,58,237,0.3);color:#7c3aed"><i class="ti ti-star" aria-hidden="true"></i> ${perfectCount} habit${perfectCount>1?'s':''} hit 100%</div>`;
+  const missedAll=habitStats.filter(h=>h.done===0).length;
+  if(missedAll>0)html+=`<div class="insight-chip chip-red"><i class="ti ti-x" aria-hidden="true"></i> ${missedAll} habit${missedAll>1?'s':''} missed entirely</div>`;
+  html+=`</div></div>`;
+
+  /* habit breakdown */
+  html+=`<div class="acct-section">
+    <div class="acct-section-title"><i class="ti ti-list-check" aria-hidden="true"></i> Habit breakdown</div>`;
+
+  habitStats.forEach(h=>{
+    const barColor=pctColor(h.pct);
+    const dotHtml=dates.map((d,i)=>{
+      const done=h.checks[dateKey(d)];
+      return `<div class="acct-dot">
+        <div class="acct-dot-circle ${done?'done':'missed'}">${done?'✓':DAY_NAMES[i][0]}</div>
+        <div class="acct-dot-label">${DAY_NAMES[i]}</div>
+      </div>`;
+    }).join('');
+
+    html+=`<div class="acct-habit-row">
+      <div class="acct-habit-top">
+        <div class="acct-habit-icon"><i class="ti ${h.icon}" aria-hidden="true"></i></div>
+        <div class="acct-habit-name">${escHtml(h.name)}</div>
+        <span style="font-size:12px;color:var(--text3);margin-right:6px">${h.done}/${h.target}</span>
+        <span class="acct-habit-pct" style="color:${barColor}">${h.pct}%</span>
+      </div>
+      <div class="acct-bar-track"><div class="acct-bar-fill" style="width:${h.pct}%;background:${barColor}"></div></div>
+      <div class="acct-dots">${dotHtml}</div>
+    </div>`;
+  });
+  html+=`</div>`;
+  return html;
+}
+
+/* ── MONTH BODY HTML ── */
+function buildMonthBody(pct,grade,msg,gradeColor,done,possible,best,worst,habitStats,weeks,firstOfMonth){
+  const r=38,circ=2*Math.PI*r;
+  const offset=circ-(pct/100)*circ;
+
+  /* week labels */
+  const weekLabels=weeks.map((wk,i)=>{
+    const days=wk.filter(d=>d);
+    if(!days.length)return`Wk ${i+1}`;
+    const first=days[0],last=days[days.length-1];
+    return first.getDate()+' – '+last.getDate();
+  });
+
+  let html=`
+  <div class="acct-score-hero">
+    <div class="acct-score-ring">
+      <svg width="88" height="88" viewBox="0 0 88 88">
+        <circle fill="none" stroke="var(--border2)" stroke-width="7" cx="44" cy="44" r="${r}"/>
+        <circle fill="none" stroke="${gradeColor}" stroke-width="7" stroke-linecap="round"
+          cx="44" cy="44" r="${r}"
+          stroke-dasharray="${circ.toFixed(1)}"
+          stroke-dashoffset="${offset.toFixed(1)}"/>
+      </svg>
+      <div class="ring-text">
+        <span class="ring-pct">${pct}%</span>
+        <span class="ring-lbl">done</span>
+      </div>
+    </div>
+    <div class="acct-score-info">
+      <div class="acct-score-grade" style="color:${gradeColor}">${grade}</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:8px;">${escHtml(msg)}</div>
+      <span style="font-size:12px;color:var(--text3)">${done} check-ins out of ${possible} possible across ${habits.length} habits</span>
+    </div>
+    <div class="acct-kpis">
+      <div class="acct-kpi"><div class="acct-kpi-val">${done}</div><div class="acct-kpi-lbl">total done</div></div>
+      <div class="acct-kpi"><div class="acct-kpi-val">${weeks.length}</div><div class="acct-kpi-lbl">weeks</div></div>
+      <div class="acct-kpi"><div class="acct-kpi-val">${habits.length}</div><div class="acct-kpi-lbl">habits</div></div>
+    </div>
+  </div>`;
+
+  /* insights */
+  html+=`<div class="acct-section">
+    <div class="acct-section-title"><i class="ti ti-sparkles" aria-hidden="true"></i> Insights</div>
+    <div class="insight-chips">`;
+  if(best)html+=`<div class="insight-chip chip-gold"><i class="ti ti-trophy" aria-hidden="true"></i> Best month: ${escHtml(best.name)} (${best.pct}%)</div>`;
+  if(worst&&worst.id!==best?.id)html+=`<div class="insight-chip chip-red"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Most inconsistent: ${escHtml(worst.name)} (${worst.pct}%)</div>`;
+
+  /* best week */
+  const weekTotals=weeks.map((wk,wi)=>{
+    let d=0,p=0;
+    habits.forEach(h=>{wk.forEach(day=>{if(day&&h.checks[dateKey(day)])d++;});p+=wk.filter(x=>x).length>0?h.target/7*wk.filter(x=>x).length:0;});
+    return{wi,pct:p>0?Math.round((d/p)*100):0,label:weekLabels[wi]};
+  });
+  const bestWk=weekTotals.reduce((a,b)=>b.pct>a.pct?b:a,weekTotals[0]);
+  const worstWk=weekTotals.reduce((a,b)=>b.pct<a.pct?b:a,weekTotals[0]);
+  if(bestWk)html+=`<div class="insight-chip" style="border-color:rgba(124,58,237,0.3);color:#7c3aed"><i class="ti ti-star" aria-hidden="true"></i> Best week: ${bestWk.label} (${bestWk.pct}%)</div>`;
+  if(worstWk&&worstWk.wi!==bestWk?.wi)html+=`<div class="insight-chip chip-red"><i class="ti ti-trending-down" aria-hidden="true"></i> Weakest week: ${worstWk.label} (${worstWk.pct}%)</div>`;
+  html+=`</div></div>`;
+
+  /* week-by-week grid */
+  html+=`<div class="acct-section">
+    <div class="acct-section-title"><i class="ti ti-table" aria-hidden="true"></i> Week-by-week breakdown</div>
+    <div class="month-grid-wrap">
+    <table class="month-grid">
+      <thead><tr>
+        <th class="habit-col">Habit</th>`;
+  weekLabels.forEach(lbl=>{html+=`<th>${lbl}</th>`;});
+  html+=`<th>Month</th></tr></thead><tbody>`;
+
+  habitStats.forEach(h=>{
+    html+=`<tr><td class="habit-col"><div style="display:flex;align-items:center;gap:8px">
+      <div class="acct-habit-icon"><i class="ti ${h.icon}" aria-hidden="true"></i></div>
+      <span style="font-size:12px;font-weight:500">${escHtml(h.name)}</span>
+    </div></td>`;
+
+    h.weekStats.forEach(ws=>{
+      const wp=ws.possible>0?Math.round((ws.done/ws.possible)*100):0;
+      const cls=wp>=70?'mcell-high':wp>=40?'mcell-mid':wp===0?'mcell-zero':'mcell-low';
+      html+=`<td><span class="month-cell ${cls}">${ws.done}/${ws.possible}</span></td>`;
+    });
+
+    const cls=h.pct>=70?'mcell-high':h.pct>=40?'mcell-mid':h.pct===0?'mcell-zero':'mcell-low';
+    html+=`<td><span class="month-cell ${cls}" style="font-size:12px;font-weight:700">${h.pct}%</span></td></tr>`;
+  });
+
+  /* footer totals row */
+  html+=`<tr style="border-top:2px solid var(--border2)">
+    <td class="habit-col" style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px">Week total</td>`;
+  weekTotals.forEach(wt=>{
+    const cls=wt.pct>=70?'mcell-high':wt.pct>=40?'mcell-mid':wt.pct===0?'mcell-zero':'mcell-low';
+    html+=`<td><span class="month-cell ${cls}">${wt.pct}%</span></td>`;
+  });
+  const ovCls=pct>=70?'mcell-high':pct>=40?'mcell-mid':pct===0?'mcell-zero':'mcell-low';
+  html+=`<td><span class="month-cell ${ovCls}" style="font-weight:700">${pct}%</span></td></tr>`;
+  html+=`</tbody></table></div></div>`;
+
+  /* per-habit progress bars */
+  html+=`<div class="acct-section">
+    <div class="acct-section-title"><i class="ti ti-chart-bar" aria-hidden="true"></i> Habit performance</div>`;
+  habitStats.forEach(h=>{
+    const barColor=pctColor(h.pct);
+    html+=`<div class="acct-habit-row">
+      <div class="acct-habit-top">
+        <div class="acct-habit-icon"><i class="ti ${h.icon}" aria-hidden="true"></i></div>
+        <div class="acct-habit-name">${escHtml(h.name)}</div>
+        <span style="font-size:12px;color:var(--text3);margin-right:6px">${h.done}/${h.expected} days</span>
+        <span class="acct-habit-pct" style="color:${barColor}">${h.pct}%</span>
+      </div>
+      <div class="acct-bar-track"><div class="acct-bar-fill" style="width:${Math.min(h.pct,100)}%;background:${barColor}"></div></div>
+    </div>`;
+  });
+  html+=`</div>`;
+  return html;
+}
+
+/* ── GOAL PAGE ── */
+function openGoalPage(){
+  document.getElementById('mainView').style.display='none';
+  document.getElementById('goalView').style.display='block';
+  window.scrollTo(0,0);populateGoalPage();
+}
+function closeGoalPage(){
+  document.getElementById('goalView').style.display='none';
+  document.getElementById('mainView').style.display='block';
+  window.scrollTo(0,0);
+}
+function recalcDaysLeft(){
+  const sd=goalData.startDate||new Date().toISOString().slice(0,10);
+  const start=new Date(sd+'T00:00:00');
+  const end=new Date(start);end.setDate(start.getDate()+90);
+  const today=new Date();today.setHours(0,0,0,0);
+  document.getElementById('gvDaysLeft').textContent=Math.max(0,Math.ceil((end-today)/86400000));
+}
+function updateStartDate(val){
+  if(!val)return;
+  goalData.startDate=val;
+  saveData();
+  recalcDaysLeft();
+}
+function populateGoalPage(){
+  document.getElementById('gvGoalName').value=goalData.title;
+  document.getElementById('gvWhy').value=goalData.why||'';
+  document.getElementById('gvPlan').value=goalData.plan||'';
+  document.getElementById('gvIdentity').value=goalData.identity||'';
+  document.getElementById('gvStartDate').value=goalData.startDate||new Date().toISOString().slice(0,10);
+  recalcDaysLeft();
+  document.getElementById('gvHabitCount').textContent=habits.length;
+  const dates=getWeekDates(0);let tot=0,poss=0;
+  habits.forEach(h=>{dates.forEach(d=>{if(h.checks[dateKey(d)])tot++;});poss+=h.target;});
+  document.getElementById('gvOverallPct').textContent=(poss>0?Math.round((tot/poss)*100):0)+'%';
+  if(goalData.coverImage)document.getElementById('gvCover').style.backgroundImage=`url(${goalData.coverImage})`;
+  renderMilestones();renderGvHabits();renderGvProgress();
+}
+function renderGvProgress(){
+  const dates=getWeekDates(0);const today=dateKey(new Date());
+  let todayDone=0,weekDone=0;const todayIdx=dates.findIndex(d=>dateKey(d)===today);
+  habits.forEach(h=>{dates.forEach((d,i)=>{if(h.checks[dateKey(d)]){weekDone++;if(i===todayIdx)todayDone++;}});});
+  const tot=habits.reduce((a,h)=>{dates.forEach(d=>{if(h.checks[dateKey(d)])a++;});return a;},0);
+  const poss=habits.reduce((a,h)=>a+h.target,0);
+  const p=poss>0?Math.round((tot/poss)*100):0;
+  document.getElementById('gvProgressGrid').innerHTML=`
+    <div class="gv-prog-card"><div class="gv-prog-val">${todayDone}/${habits.length}</div><div class="gv-prog-lbl">Today</div></div>
+    <div class="gv-prog-card"><div class="gv-prog-val">${weekDone}</div><div class="gv-prog-lbl">This week</div></div>
+    <div class="gv-prog-card"><div class="gv-prog-val">${p}%</div><div class="gv-prog-lbl">Week rate</div></div>
+    <div class="gv-prog-card"><div class="gv-prog-val">${habits.length}</div><div class="gv-prog-lbl">Active habits</div></div>`;
+}
+function renderMilestones(){
+  const list=document.getElementById('milestonesList');list.innerHTML='';
+  goalData.milestones.forEach((m,i)=>{
+    const div=document.createElement('div');div.className='milestone-item';
+    div.innerHTML=`<div class="milestone-num">${i+1}</div>
+      <input class="milestone-input" type="text" value="${escHtml(m.text)}" placeholder="Milestone ${i+1}" onchange="goalData.milestones[${i}].text=this.value">
+      <button class="milestone-del" onclick="deleteMilestone(${m.id})" aria-label="Delete"><i class="ti ti-x" aria-hidden="true"></i></button>`;
+    list.appendChild(div);
+  });
+}
+function addMilestone(){
+  goalData.milestones.push({id:nextMilestoneId++,text:''});renderMilestones();
+  const inp=document.querySelectorAll('.milestone-input');if(inp.length)inp[inp.length-1].focus();
+}
+function deleteMilestone(id){goalData.milestones=goalData.milestones.filter(m=>m.id!==id);renderMilestones();}
+function renderGvHabits(){
+  const list=document.getElementById('gvHabitsList');list.innerHTML='';
+  const dates=getWeekDates(0);
+  habits.forEach(h=>{
+    let w=0;dates.forEach(d=>{if(h.checks[dateKey(d)])w++;});
+    const pct=h.target>0?Math.round((w/h.target)*100):0;
+    const div=document.createElement('div');div.className='gv-habit-row';
+    div.innerHTML=`<div class="gv-habit-icon"><i class="ti ${h.icon}" aria-hidden="true"></i></div>
+      <div class="gv-habit-name">${escHtml(h.name)}</div>
+      <div class="gv-habit-target">${pct}% this week</div>
+      <div class="gv-habit-target" style="background:var(--accent-bg);color:var(--accent);border-color:transparent">${h.target}× / week</div>
+      <div style="display:flex;gap:4px;margin-left:6px;flex-shrink:0">
+        <button class="action-btn" onclick="editHabit(${h.id})" title="Edit habit"><i class="ti ti-edit" aria-hidden="true"></i></button>
+        <button class="action-btn del" onclick="deleteGvHabit(${h.id})" title="Delete habit"><i class="ti ti-trash" aria-hidden="true"></i></button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+function deleteGvHabit(id){
+  if(!confirm('Delete this habit?'))return;
+  habits=habits.filter(h=>h.id!==id);
+  saveData();
+  renderGvHabits();renderGvProgress();
+  document.getElementById('gvHabitCount').textContent=habits.length;
+}
+function saveGoalPage(){
+  goalData.title=document.getElementById('gvGoalName').value.trim()||goalData.title;
+  goalData.why=document.getElementById('gvWhy').value;
+  goalData.plan=document.getElementById('gvPlan').value;
+  goalData.identity=document.getElementById('gvIdentity').value;
+  document.getElementById('goalTitleDisplay').textContent=goalData.title;
+  saveData();
+  const btn=document.querySelector('.gv-topbar-right .btn');const orig=btn.innerHTML;
+  btn.innerHTML='<i class="ti ti-check"></i> Saved!';btn.style.cssText='background:var(--success);color:white;border-color:transparent';
+  setTimeout(()=>{btn.innerHTML=orig;btn.style.cssText='';},1800);
+}
+
+/* ── WEEK NAV ── */
+function shiftWeek(dir){weekOffset+=dir;renderTable();}
+function renderWeekTabs(){
+  const dates=getWeekDates(weekOffset);const today=dateKey(new Date());
+  const tabs=document.getElementById('weekTabs');tabs.innerHTML='';
+  dates.forEach((d,i)=>{
+    const key=dateKey(d);const isToday=key===today;
+    const tab=document.createElement('div');
+    tab.className='day-tab'+(isToday?' today active':'');
+    tab.innerHTML=`<span class="day-name">${DAY_NAMES[i]}</span><span class="day-num">${d.getDate().toString().padStart(2,'0')}</span>`;
+    tabs.appendChild(tab);
+    const th=document.getElementById('th'+i);
+    if(th){th.textContent=DAY_NAMES[i];th.style.background=isToday?'var(--accent-bg)':'';th.style.color=isToday?'var(--accent)':'';}
+  });
+  return dates;
+}
+
+/* ── TABLE ── */
+function renderRing(el,pct){
+  const r=14,circ=2*Math.PI*r,offset=circ-(pct/100)*circ,color=pctColor(pct);
+  el.innerHTML=`<svg width="36" height="36" viewBox="0 0 36 36"><circle class="ring-track" cx="18" cy="18" r="${r}"/><circle class="ring-fill" cx="18" cy="18" r="${r}" stroke="${color}" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/></svg><div class="ring-text">${Math.round(pct)}%</div>`;
+}
+function renderTable(){
+  const dates=renderWeekTabs();const today=dateKey(new Date());
+  const tbody=document.getElementById('habitBody');const tfoot=document.getElementById('habitFoot');
+  tbody.innerHTML='';
+  const colTotal=[0,0,0,0,0,0,0];let totalChecks=0,totalPossible=0,todayDone=0;
+  const todayIdx=dates.findIndex(d=>dateKey(d)===today);
+  habits.forEach(h=>{
+    const tr=document.createElement('tr');let weekChecks=0;
+    dates.forEach((d,i)=>{if(h.checks[dateKey(d)]){weekChecks++;colTotal[i]++;totalChecks++;}});
+    const pct=h.target>0?Math.min(100,(weekChecks/h.target)*100):0;
+    totalPossible+=h.target;
+    if(todayIdx>=0&&h.checks[dateKey(dates[todayIdx])])todayDone++;
+    const dayTds=dates.map((d,i)=>{
+      const key=dateKey(d),chk=h.checks[key]?'checked':'',isToday=key===today;
+      return `<td class="center" style="${isToday?'background:var(--accent-bg)':''}"><input type="checkbox" class="habit-check" ${chk} onchange="toggle(${h.id},'${key}',this)"></td>`;
+    }).join('');
+    tr.innerHTML=`<td><div class="habit-name">
+      <div class="habit-icon"><i class="ti ${h.icon}" aria-hidden="true"></i></div>
+      <span class="habit-text">${escHtml(h.name)}</span>
+      <div class="habit-actions">
+        <button class="action-btn" onclick="editHabit(${h.id})" title="Edit"><i class="ti ti-edit" aria-hidden="true"></i></button>
+        <button class="action-btn del" onclick="deleteHabit(${h.id})" title="Delete"><i class="ti ti-trash" aria-hidden="true"></i></button>
+      </div></div></td>
+      <td class="center"><div class="progress-ring" id="ring-${h.id}"></div></td>
+      ${dayTds}
+      <td class="center"><span class="per-week"><i class="ti ti-repeat" aria-hidden="true"></i>${h.target}×</span></td>`;
+    tbody.appendChild(tr);
+    requestAnimationFrame(()=>{const r=document.getElementById('ring-'+h.id);if(r)renderRing(r,pct);});
+  });
+  const addRow=document.createElement('tr');addRow.className='add-row';
+  addRow.innerHTML=`<td colspan="10"><button class="add-habit-btn" onclick="openModal()"><i class="ti ti-plus" aria-hidden="true"></i> Add habit</button></td>`;
+  tbody.appendChild(addRow);
+  const overallPct=totalPossible>0?(totalChecks/totalPossible)*100:0;
+  let footHtml=`<tr class="footer-row"><td style="font-weight:600;font-size:12px;color:var(--text2)">Week total&nbsp;<span style="color:var(--accent);font-size:13px">${Math.round(overallPct)}%</span></td><td></td>`;
+  dates.forEach((d,i)=>{
+    const p=habits.length>0?Math.round((colTotal[i]/habits.length)*100):0;
+    const cls=p>=70?'pct-high':p>=40?'pct-mid':'pct-low';const isToday=dateKey(d)===today;
+    footHtml+=`<td class="col-pct ${cls}" style="${isToday?'background:var(--accent-bg)':''}">${p}%</td>`;
+  });
+  footHtml+=`<td></td></tr>`;tfoot.innerHTML=footHtml;
+  updateSummary(overallPct,todayDone,totalChecks);
+}
+function updateSummary(overallPct,todayDone,totalChecks){
+  document.getElementById('overallPct').textContent=Math.round(overallPct)+'%';
+  document.getElementById('overallBar').style.width=Math.round(overallPct)+'%';
+  document.getElementById('scToday').textContent=todayDone+'/'+habits.length;
+  document.getElementById('scWeek').textContent=totalChecks;
+  document.getElementById('scTotal').textContent=habits.length;
+  document.getElementById('statCompleted').textContent=todayDone;
+  let best=null,bestPct=-1;
+  const dates=getWeekDates(0);
+  habits.forEach(h=>{let w=0;dates.forEach(d=>{if(h.checks[dateKey(d)])w++;});const p=h.target>0?(w/h.target)*100:0;if(p>bestPct){bestPct=p;best=h;}});
+  if(best){document.getElementById('scBest').textContent=best.name.length>18?best.name.slice(0,18)+'…':best.name;document.getElementById('scBestPct').textContent=Math.round(bestPct)+'% complete';}
+  const today=new Date();today.setHours(0,0,0,0);let streak=0;
+  for(let i=0;i<90;i++){const d=new Date(today);d.setDate(today.getDate()-i);if(habits.some(h=>h.checks[dateKey(d)]))streak++;else break;}
+  document.getElementById('statStreak').textContent=streak;
+}
+
+/* ── HABIT CRUD ── */
+function toggle(id,key,el){const h=habits.find(x=>x.id===id);if(!h)return;if(el.checked)h.checks[key]=true;else delete h.checks[key];saveData();renderTable();}
+function deleteHabit(id){if(!confirm('Delete this habit?'))return;habits=habits.filter(h=>h.id!==id);saveData();renderTable();}
+function editHabit(id){
+  const h=habits.find(x=>x.id===id);if(!h)return;editingId=id;
+  document.getElementById('modalTitle').textContent='Edit Habit';document.getElementById('saveBtn').textContent='Save Changes';
+  document.getElementById('habitNameInput').value=h.name;document.getElementById('habitTargetInput').value=h.target;
+  selectedIcon=h.icon;renderIconGrid();document.getElementById('modalOverlay').classList.add('open');
+}
+function openModal(){
+  editingId=null;document.getElementById('modalTitle').textContent='Add New Habit';document.getElementById('saveBtn').textContent='Add Habit';
+  document.getElementById('habitNameInput').value='';document.getElementById('habitTargetInput').value='7';
+  selectedIcon=ICONS[0];renderIconGrid();document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('habitNameInput').focus(),100);
+}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
+function saveHabit(){
+  const name=document.getElementById('habitNameInput').value.trim();if(!name){document.getElementById('habitNameInput').focus();return;}
+  const target=Math.min(7,Math.max(1,parseInt(document.getElementById('habitTargetInput').value)||7));
+  if(editingId){const h=habits.find(x=>x.id===editingId);if(h){h.name=name;h.target=target;h.icon=selectedIcon;}}
+  else{habits.push({id:nextId++,name,icon:selectedIcon,target,checks:{}});}
+  saveData();closeModal();renderTable();
+  // refresh goal page if it's open
+  const gv=document.getElementById('goalView');
+  if(gv&&gv.style.display==='block'){
+    renderGvHabits();renderGvProgress();
+    document.getElementById('gvHabitCount').textContent=habits.length;
+  }
+}
+function renderIconGrid(){
+  const grid=document.getElementById('iconGrid');grid.innerHTML='';
+  ICONS.forEach(ic=>{
+    const btn=document.createElement('div');btn.className='icon-option'+(ic===selectedIcon?' selected':'');
+    btn.innerHTML=`<i class="ti ${ic}" aria-hidden="true"></i>`;btn.onclick=()=>{selectedIcon=ic;renderIconGrid();};
+    grid.appendChild(btn);
+  });
+}
+
+/* ── PERSIST (Supabase when signed in, localStorage fallback) ── */
+const TRK_SUPABASE_URL='https://kmvisuvuateaemyeiore.supabase.co';
+const TRK_SUPABASE_ANON_KEY='sb_publishable_OdXWo0ORdLPs4J5QeT3CCw_uXAQnIhF';
+let trkSb=null, trkUserId=null, _trkSaveT=null;
+function trkSnapshot(){return {habits,nextId,goalData,nextMilestoneId};}
+function applySnapshot(d){if(!d)return;if(d.habits)habits=d.habits;if(typeof d.nextId==='number')nextId=d.nextId;if(d.goalData)goalData=Object.assign(goalData,d.goalData);if(typeof d.nextMilestoneId==='number')nextMilestoneId=d.nextMilestoneId;}
+function saveData(){
+  try{localStorage.setItem('yelson_habits',JSON.stringify(trkSnapshot()));}catch(e){}
+  if(trkSb&&trkUserId){clearTimeout(_trkSaveT);_trkSaveT=setTimeout(async()=>{
+    try{await trkSb.from('tracker90d').upsert({id:trkUserId,data:trkSnapshot(),updated_at:new Date().toISOString()});}
+    catch(e){console.error('[90D] cloud save failed',e);}
+  },600);}
+}
+async function loadData(){
+  if(trkSb&&trkUserId){
+    try{const {data}=await trkSb.from('tracker90d').select('data').eq('id',trkUserId).maybeSingle();
+      if(data&&data.data&&Object.keys(data.data).length){applySnapshot(data.data);return;}
+    }catch(e){console.error('[90D] cloud load failed',e);}
+  }
+  try{const raw=localStorage.getItem('yelson_habits');if(raw)applySnapshot(JSON.parse(raw));}catch(e){}
+}
+async function trkInitCloud(){
+  try{
+    if(window.supabase && TRK_SUPABASE_URL){
+      trkSb=window.supabase.createClient(TRK_SUPABASE_URL,TRK_SUPABASE_ANON_KEY);
+      const {data}=await trkSb.auth.getSession();
+      if(data&&data.session){
+        trkUserId=data.session.user.id;
+        // personalize the cover with the closer's name
+        try{const {data:p}=await trkSb.from('players').select('name,public').eq('id',trkUserId).maybeSingle();
+          const nm=(p&&(p.name||(p.public&&p.public.name)))||'';
+          if(nm){const first=nm.split(' ')[0];
+            document.querySelectorAll('.cover-title,.gv-cover-title').forEach(el=>el.textContent=first);}
+        }catch(_){}
+      }
+    }
+  }catch(e){console.error('[90D] supabase init failed',e);}
+}
+function exportData(){
+  const blob=new Blob([JSON.stringify({habits,goalData,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='yelson-habits-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+}
+
+/* ── INIT ── */
+document.getElementById('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.getElementById('acctOverlay').addEventListener('click',function(e){if(e.target===this)closeAcct();});
+document.getElementById('habitNameInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveHabit();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeAcct();}});
+
+(async function initTracker(){
+  await trkInitCloud();
+  await loadData();
+  if(!goalData.badges||!goalData.badges.length)goalData.badges=['#1 Closer','Leader','Marketer'];
+  if(goalData.coverImage){document.getElementById('mainCover').style.backgroundImage=`url(${goalData.coverImage})`;document.getElementById('gvCover').style.backgroundImage=`url(${goalData.coverImage})`;}
+  document.getElementById('goalTitleDisplay').textContent=goalData.title;
+  renderBadges();renderIconGrid();renderTable();
+})();
+</script>
+</body>
+</html>
