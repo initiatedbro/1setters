@@ -1485,6 +1485,55 @@ function renderLeaderboard(){
 
   const periodLabel={all:'All Time',month:'This Month','30':'Last 30 Days','7':'Last 7 Days'}[lbPeriod];
 
+  // Podium value formatter — derives the value to show under each top-3
+  // setter's name from whichever metric is currently selected in RANK BY.
+  const rankMeta={
+    sets:       {label:'Sets',        fmt:s=>s.sets},
+    dials:      {label:'Dials',       fmt:s=>s.dials.toLocaleString()},
+    pitched:    {label:'Pitched',     fmt:s=>s.pitched},
+    closes:     {label:'Closes',      fmt:s=>s.closed},
+    cash:       {label:'Cash',        fmt:s=>money(s.cash)},
+    commission: {label:'Commissions', fmt:s=>money(s.commission)},
+    show:       {label:'Show Rate',   fmt:s=>pct(s.showRate)},
+    close:      {label:'Pitch→Close', fmt:s=>pct(s.pitchClose)},
+  }[lbRank] || {label:'Sets', fmt:s=>s.sets};
+  const top3=[rows[0],rows[1],rows[2]];
+  const podiumOrder=[1,0,2]; // visual order: 2nd, 1st (center), 3rd
+  const podiumHeights=['180px','230px','150px']; // matches order above
+  const podiumColors=[
+    'linear-gradient(180deg,#3a3a44 0%,#1c1c24 100%)',  // 2nd silver
+    'linear-gradient(180deg,#c08a25 0%,#5a3e0d 100%)',  // 1st gold
+    'linear-gradient(180deg,#8a4e2a 0%,#3a2010 100%)'   // 3rd bronze
+  ];
+  const podiumIcons=['🥈','👑','🥉'];
+  const podiumLabels=['2','1','3'];
+  const podiumColumn=(slot,visualIdx)=>{
+    const r=top3[slot];
+    const isCenter=visualIdx===1;
+    if(!r){
+      // Empty podium spot
+      return `<div style="display:flex;flex-direction:column;align-items:center;flex:1">
+        <div style="font-size:${isCenter?'34px':'24px'};opacity:.35;margin-bottom:10px">${podiumIcons[visualIdx]}</div>
+        <div style="width:${isCenter?'92px':'64px'};height:${isCenter?'92px':'64px'};border-radius:50%;border:2px dashed var(--border);margin-bottom:8px"></div>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:14px">Open spot</div>
+        <div style="width:100%;max-width:${isCenter?'180px':'150px'};height:${podiumHeights[visualIdx]};background:${podiumColors[visualIdx]};border-radius:14px 14px 0 0;border:1px solid var(--border);display:flex;align-items:flex-start;justify-content:center;padding-top:14px;opacity:.45">
+          <div style="font-size:${isCenter?'42px':'32px'};font-weight:800;color:rgba(255,255,255,.6)">${podiumLabels[visualIdx]}</div>
+        </div>
+      </div>`;
+    }
+    const val=rankMeta.fmt(r.st);
+    const valColor=visualIdx===1?'#ffd700':visualIdx===0?'#c0c0c0':'#cd7f32';
+    return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;cursor:pointer" onclick="openPreview('${r.u.id}')">
+      <div style="font-size:${isCenter?'34px':'24px'};margin-bottom:10px">${podiumIcons[visualIdx]}</div>
+      <div style="margin-bottom:8px">${avatarHTML(r.u, isCenter?92:64, isCenter?34:22)}</div>
+      <div style="font-weight:800;font-size:${isCenter?'17px':'14px'};text-align:center;line-height:1.2;padding:0 6px">${r.u.name}</div>
+      <div style="font-size:${isCenter?'22px':'18px'};font-weight:800;color:${valColor};margin:4px 0 10px;font-family:var(--mono,monospace)">${val}</div>
+      <div style="width:100%;max-width:${isCenter?'180px':'150px'};height:${podiumHeights[visualIdx]};background:${podiumColors[visualIdx]};border-radius:14px 14px 0 0;border:1px solid var(--border);display:flex;align-items:flex-start;justify-content:center;padding-top:14px">
+        <div style="font-size:${isCenter?'42px':'32px'};font-weight:800;color:rgba(255,255,255,.85)">${podiumLabels[visualIdx]}</div>
+      </div>
+    </div>`;
+  };
+
   document.getElementById('view').innerHTML=`
   <div class="page-head"><div>
     <div class="page-title">Leaderboard 🏆</div>
@@ -1503,6 +1552,14 @@ function renderLeaderboard(){
         <span style="color:var(--muted);font-size:11px;font-weight:700;letter-spacing:1px">RANK BY</span>
         <div class="chips">
           ${[['sets','Sets Made'],['dials','Dials'],['pitched','Pitched'],['closes','Closes'],['cash','Cash'],['commission','Commissions'],['show','Show Rate'],['close','Pitch→Close']].map(([k,l])=>`<button class="chip vio ${lbRank===k?'active':''}" onclick="lbRank='${k}';renderLeaderboard()">${l}</button>`).join('')}
+        </div>
+      </div>
+
+      <!-- TOP 3 PODIUM -->
+      <div class="card" style="padding:24px 16px 0;margin-bottom:18px;background:radial-gradient(ellipse at 50% -10%, rgba(192,138,37,.18) 0%, var(--bg) 65%)">
+        <div style="text-align:center;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:2px;margin-bottom:14px">${periodLabel.toUpperCase()} · TOP 3 · BY ${rankMeta.label.toUpperCase()}</div>
+        <div style="display:flex;align-items:flex-end;gap:8px;justify-content:center;max-width:600px;margin:0 auto">
+          ${podiumOrder.map((slot,visualIdx)=>podiumColumn(slot,visualIdx)).join('')}
         </div>
       </div>
       <div class="card" style="padding:8px">
