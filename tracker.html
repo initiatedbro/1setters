@@ -1177,8 +1177,8 @@ function renderIconGrid(){
 }
 
 /* ── PERSIST (Supabase when signed in, localStorage fallback) ── */
-const TRK_SUPABASE_URL='https://kmvisuvuateaemyeiore.supabase.co';
-const TRK_SUPABASE_ANON_KEY='sb_publishable_OdXWo0ORdLPs4J5QeT3CCw_uXAQnIhF';
+const TRK_SUPABASE_URL='https://patooxnyklmknihshybz.supabase.co';
+const TRK_SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdG9veG55a2xta25paHNoeWJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0ODE2OTQsImV4cCI6MjA5MzA1NzY5NH0.aqWn0TelQKb5FZdC34Bg4NzquUnYESiXXLB2xEHs51M';
 let trkSb=null, trkUserId=null, _trkSaveT=null;
 function trkSnapshot(){return {habits,nextId,goalData,nextMilestoneId};}
 function applySnapshot(d){if(!d)return;if(d.habits)habits=d.habits;if(typeof d.nextId==='number')nextId=d.nextId;if(d.goalData)goalData=Object.assign(goalData,d.goalData);if(typeof d.nextMilestoneId==='number')nextMilestoneId=d.nextMilestoneId;}
